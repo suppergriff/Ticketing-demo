@@ -1,24 +1,39 @@
 import http from "k6/http";
-import { check, sleep } from "k6";
+import { check } from "k6";
 import { Rate } from "k6/metrics";
 
 /**
- * Scene 1 · V1 naked origin.
- * Rotating residential IPs beat the naive per-IP throttle. No Turnstile → bots get 200.
+ * Scene 1 · checkout CPU stress (optimized)
+ * - Moderate VUs so requests actually reach Node burnCpu
+ * - Longer timeout so k6 waits for the single-threaded burn
+ * Pair with server: CHECKOUT_BURN_MS=800 (or higher), IP_RATE_LIMIT=0
+ *
+ * Run:
+ *   k6 run load-test-checkout-cpu.js
+ *   # or override:
+ *   BASE_URL=https://ticket-01.griffhu.top k6 run load-test-checkout-cpu.js
  */
-const BASE_URL = (__ENV.BASE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const botWins = new Rate("bot_checkout_ok");
+const serverErrors = new Rate("server_5xx_errors");
+
+const BASE_URL = (__ENV.BASE_URL || "https://ticket-01.griffhu.top").replace(/\/$/, "");
 
 export const options = {
   scenarios: {
-    residential_proxy_pool_v1: {
-      executor: "constant-vus",
-      vus: Number(__ENV.VUS || 30),
-      duration: __ENV.DURATION || "15s",
+    scalper_rush_cpu: {
+      executor: "ramping-vus",
+      startVUs: 10,
+      stages: [
+        { duration: "15s", target: 40 },
+        { duration: "45s", target: 80 },
+        { duration: "15s", target: 0 },
+      ],
+      gracefulRampDown: "10s",
     },
   },
   thresholds: {
-    bot_checkout_ok: ["rate>0.70"],
+    // Demo-oriented: expect some pressure; tune after you measure
+    server_5xx_errors: ["rate<0.20"],
+    http_req_duration: ["p(95)<30000"],
   },
 };
 
@@ -32,11 +47,13 @@ function randomInt(min, max) {
 
 export default function () {
   const ip = spoofIp();
+  const randomUserId = Math.floor(Math.random() * 100000);
+
   const res = http.post(
     `${BASE_URL}/api/checkout`,
     JSON.stringify({
-      email: `bot-${__VU}-${__ITER}@proxy-pool.test`,
-      holder_name: "Residential Bot",
+      email: `bot-${__VU}-${__ITER}-${randomUserId}@proxy-pool.test`,
+      holder_name: `Scalper-${randomUserId}`,
       section: "A",
     }),
     {
@@ -45,15 +62,15 @@ export default function () {
         "X-Forwarded-For": ip,
         "CF-Connecting-IP": ip,
       },
-      timeout: "10s",
+      timeout: "30s",
     },
   );
 
-  const ok = res.status === 200 || res.status === 409;
-  botWins.add(res.status === 200);
+  const isServerDown = res.status >= 500 || res.status === 0;
+  serverErrors.add(isServerDown);
+
   check(res, {
-    "V1 naked origin does not require Turnstile": () => res.status !== 403,
-    "bot purchase or sold-out (not challenge)": () => ok,
+    "server alive (status < 500)": () => !isServerDown,
+    "valid business resp (200/409)": (r) => r.status === 200 || r.status === 409,
   });
-  sleep(0.05);
 }
