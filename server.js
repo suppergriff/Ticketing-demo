@@ -17,11 +17,6 @@ const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 3000);
 const CHECKOUT_BURN_MS = Number(
   process.env.CHECKOUT_BURN_MS ?? (FRAGILE ? 200 : 0),
 );
-/**
- * Only one full hybrid burn per this window (ms). Backlog after a burn returns 503
- * without spawning — so CPU drops as soon as k6 stops instead of draining for minutes.
- */
-const BURN_SLOT_MS = Number(process.env.BURN_SLOT_MS ?? CHECKOUT_BURN_MS || 800);
 /** V1 IP rate limit per 10s window. 0 = disabled (needed for single-host k6). */
 const IP_RATE_LIMIT = Number(process.env.IP_RATE_LIMIT ?? 8);
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
@@ -63,22 +58,6 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-let burnSlotsUsed = 0;
-let burnWindowStart = 0;
-
-/** At most one full burn per BURN_SLOT_MS; excess callers should shed without burning. */
-function tryAcquireBurnSlot() {
-  if (!CHECKOUT_BURN_MS) return true;
-  const now = Date.now();
-  if (now - burnWindowStart >= BURN_SLOT_MS) {
-    burnWindowStart = now;
-    burnSlotsUsed = 0;
-  }
-  if (burnSlotsUsed >= 1) return false;
-  burnSlotsUsed += 1;
-  return true;
-}
-
 /**
  * Hybrid burn: spawn 2 node -e loops (peg both cores for mpstat) then sync-busy
  * the main thread so the event loop starves — legitimate clients slow/timeout under k6.
@@ -86,28 +65,20 @@ function tryAcquireBurnSlot() {
 async function burnCpu(ms) {
   if (!ms || ms <= 0) return;
   const script = `const e=Date.now()+${Number(ms)};let x=0;while(Date.now()<e)x^=Math.imul(x+1,2654435761)`;
-  const children = [];
   const one = () =>
     new Promise((resolve, reject) => {
       const p = spawn(process.execPath, ["-e", script], { stdio: "ignore" });
-      children.push(p);
       p.on("exit", resolve);
       p.on("error", reject);
     });
-  try {
-    // Start children first so they run while the main thread blocks.
-    const kids = Promise.all([one(), one()]);
-    const end = Date.now() + ms;
-    let x = 0;
-    while (Date.now() < end) {
-      x ^= Math.imul(x + 1, 2654435761);
-    }
-    await kids;
-  } finally {
-    for (const p of children) {
-      if (p.exitCode === null && !p.killed) p.kill("SIGKILL");
-    }
+  // Start children first so they run while the main thread blocks.
+  const kids = Promise.all([one(), one()]);
+  const end = Date.now() + ms;
+  let x = 0;
+  while (Date.now() < end) {
+    x ^= Math.imul(x + 1, 2654435761);
   }
+  await kids;
 }
 
 function exclusiveFragile(work) {
@@ -273,14 +244,6 @@ app.post("/api/checkout", async (req, res) => {
 
   if (!body.email || !body.email.includes("@")) {
     return res.status(400).json({ error: "invalid_email" });
-  }
-
-  // One burn per slot; event-loop backlog sheds fast so CPU cools when k6 stops.
-  if (!tryAcquireBurnSlot()) {
-    return res.status(503).json({
-      error: "origin_overloaded",
-      message: "Stage 1 origin collapse: CPU burn backlog shed",
-    });
   }
 
   // Burn before DB so sold-out (409) requests still spike CPU under k6.
