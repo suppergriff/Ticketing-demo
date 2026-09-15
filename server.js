@@ -12,6 +12,12 @@ const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 8787);
 const FRAGILE = String(process.env.ORIGIN_FRAGILE || "1") !== "0";
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 3000);
+/** Sync CPU burn per /api/checkout (ms). 0 = off. Demo default when fragile. */
+const CHECKOUT_BURN_MS = Number(
+  process.env.CHECKOUT_BURN_MS ?? (FRAGILE ? 200 : 0),
+);
+/** V1 IP rate limit per 10s window. 0 = disabled (needed for single-host k6). */
+const IP_RATE_LIMIT = Number(process.env.IP_RATE_LIMIT ?? 8);
 const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
 const TURNSTILE_SECRET_KEY =
   process.env.TURNSTILE_SECRET_KEY || "1x0000000000000000000000000000000AA";
@@ -51,6 +57,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Busy-loop on the Node main thread so k6 can peg CPU during checkout demos. */
+function burnCpu(ms) {
+  if (!ms || ms <= 0) return;
+  const end = Date.now() + ms;
+  let x = 0;
+  while (Date.now() < end) {
+    x ^= Math.imul(x + 1, 2654435761);
+  }
+  return x;
+}
+
 function exclusiveFragile(work) {
   if (!FRAGILE) return work();
   const run = fragileChain.then(work, work);
@@ -78,7 +95,10 @@ function slidingLimited(store, key, { windowMs, limit }) {
 
 /** V1 naked origin: naive per-IP limit — residential proxies rotate IPs and waltz through. */
 function ipRateLimited(ip) {
-  return slidingLimited(ipHits, ip || "unknown", { windowMs: 10_000, limit: 8 });
+  return slidingLimited(ipHits, ip || "unknown", {
+    windowMs: 10_000,
+    limit: IP_RATE_LIMIT,
+  });
 }
 
 /** V2 edge simulation: session / device fingerprint (Custom Key), not source IP. */
@@ -127,6 +147,8 @@ app.get("/api/health", (_req, res) => {
     fragile: FRAGILE,
     tickets: n,
     port: PORT,
+    checkoutBurnMs: CHECKOUT_BURN_MS,
+    ipRateLimit: IP_RATE_LIMIT,
   });
 });
 
@@ -200,7 +222,7 @@ app.post("/api/checkout", (req, res) => {
   const body = parseCheckoutBody(req);
   res.set("X-Nexus-Checkout", "v1-naked");
 
-  if (ipRateLimited(body.ip)) {
+  if (IP_RATE_LIMIT > 0 && ipRateLimited(body.ip)) {
     return res.status(429).json({
       error: "ip_rate_limited",
       message: "V1 origin IP throttle. Rotating residential proxies bypass this easily.",
@@ -210,6 +232,9 @@ app.post("/api/checkout", (req, res) => {
   if (!body.email || !body.email.includes("@")) {
     return res.status(400).json({ error: "invalid_email" });
   }
+
+  // Burn before DB so sold-out (409) requests still spike CPU under k6.
+  burnCpu(CHECKOUT_BURN_MS);
 
   return runCheckoutTxn(res, body);
 });
@@ -346,7 +371,9 @@ app.use((req, res) => {
 
 const server = app.listen(PORT, () => {
   console.log(`NEXUS origin listening on http://127.0.0.1:${PORT}`);
-  console.log(`fragile=${FRAGILE} timeout=${REQUEST_TIMEOUT_MS}ms tickets=${countTickets.get().n}`);
+  console.log(
+    `fragile=${FRAGILE} timeout=${REQUEST_TIMEOUT_MS}ms checkoutBurn=${CHECKOUT_BURN_MS}ms ipLimit=${IP_RATE_LIMIT} tickets=${countTickets.get().n}`,
+  );
 });
 server.timeout = Math.max(REQUEST_TIMEOUT_MS + 500, 4000);
 server.requestTimeout = Math.max(REQUEST_TIMEOUT_MS + 1000, 5000);
