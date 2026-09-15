@@ -58,7 +58,10 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Spawn 2 short-lived node -e loops so one checkout can peg both cores. */
+/**
+ * Hybrid burn: spawn 2 node -e loops (peg both cores for mpstat) then sync-busy
+ * the main thread so the event loop starves — legitimate clients slow/timeout under k6.
+ */
 async function burnCpu(ms) {
   if (!ms || ms <= 0) return;
   const script = `const e=Date.now()+${Number(ms)};let x=0;while(Date.now()<e)x^=Math.imul(x+1,2654435761)`;
@@ -68,7 +71,14 @@ async function burnCpu(ms) {
       p.on("exit", resolve);
       p.on("error", reject);
     });
-  await Promise.all([one(), one()]);
+  // Start children first so they run while the main thread blocks.
+  const kids = Promise.all([one(), one()]);
+  const end = Date.now() + ms;
+  let x = 0;
+  while (Date.now() < end) {
+    x ^= Math.imul(x + 1, 2654435761);
+  }
+  await kids;
 }
 
 function exclusiveFragile(work) {
