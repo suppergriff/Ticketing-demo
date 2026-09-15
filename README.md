@@ -24,7 +24,7 @@ Requires Node 20+.
 
 ```bash
 npm install
-npm start                  # http://127.0.0.1:8787
+npm start                  # http://127.0.0.1:80
 ```
 
 This repo already includes a demo `.env`, `data/tickets.db`, and 200 ticket JPGs.
