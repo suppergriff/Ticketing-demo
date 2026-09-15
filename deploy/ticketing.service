@@ -1,6 +1,9 @@
 [Unit]
-Description=NEXUS GATE ticketing demo (Express)
+Description=NEXUS GATE ticketing demo (Express) — legacy home-dir unit
 After=network.target
+
+# Prefer deploy/ticketing-demo.service (/opt/ticketing-demo) for production.
+# Keep this file only as a reference for a non-/opt layout.
 
 [Service]
 Type=simple
@@ -12,7 +15,6 @@ ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=3
 
-# Allow binding PORT=80 without running as root
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 NoNewPrivileges=true

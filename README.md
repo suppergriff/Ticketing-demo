@@ -65,23 +65,31 @@ k6 run load-test-scene2-stage1.js
 
 ## Deploy to EC2 (GitHub Actions)
 
-Push to `main` (or run **Actions → Deploy to EC2 → Run workflow**) SSHs into your instance, pulls latest `main`, runs `npm ci`, and restarts systemd unit `ticketing`.
+Push to `main` (or **Actions → Deploy to EC2 → Run workflow**) SSHs into the instance, updates **`/opt/ticketing-demo`**, runs `npm ci`, and restarts **`ticketing-demo`**.
+
+Nginx terminates HTTPS for `ticket-01.griffhu.top` and proxies to `127.0.0.1:8787`.
 
 ### One-time EC2 setup
 
 ```bash
-# On the instance (Amazon Linux 2023 example)
-sudo dnf install -y git nodejs npm
-git clone https://github.com/suppergriff/Ticketing-demo.git ~/Ticketing-demo
-cd ~/Ticketing-demo
-npm install
-sudo cp deploy/ticketing.service /etc/systemd/system/ticketing.service
-# Edit User/WorkingDirectory/EnvironmentFile if your path/user differs
+# Amazon Linux 2023 example — production path used by Actions
+sudo dnf install -y git nodejs npm nginx
+sudo git clone https://github.com/suppergriff/Ticketing-demo.git /opt/ticketing-demo
+cd /opt/ticketing-demo
+sudo npm install
+sudo cp deploy/ticketing-demo.service /etc/systemd/system/ticketing-demo.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now ticketing
+sudo systemctl enable --now ticketing-demo
+# Point nginx :443/:80 → http://127.0.0.1:8787 (Certbot optional)
 ```
 
-Open security group inbound **TCP 80** (and **22** for SSH). Ensure the Actions runner can reach port 22.
+Disable any unused legacy unit so only one Node listens on 8787:
+
+```bash
+sudo systemctl disable --now ticketing.service 2>/dev/null || true
+```
+
+Open security group inbound **TCP 80/443** (and **22** for SSH / Actions).
 
 ### GitHub Secrets
 
@@ -92,24 +100,25 @@ Repo → **Settings → Secrets and variables → Actions**:
 | `EC2_HOST` | Public IP or DNS |
 | `EC2_USER` | `ec2-user` |
 | `EC2_SSH_KEY` | Full private key PEM (including `BEGIN` / `END` lines) |
-| `EC2_APP_DIR` | Optional, default `$HOME/Ticketing-demo` |
-| `EC2_SERVICE_NAME` | Optional, default `ticketing` |
+| `EC2_APP_DIR` | `/opt/ticketing-demo` (workflow default if unset) |
+| `EC2_SERVICE_NAME` | `ticketing-demo` (workflow default if unset) |
 
-Until these secrets exist, the workflow fails fast on the “Require deploy secrets” step.
+Until the host/user/key secrets exist, the workflow fails fast on the “Require deploy secrets” step.
 
 ## Repo map
 
 ```text
-├── server.js                 Express origin (checkout + ticket JPG)
-├── seed.js                   SQLite + JPG generation
-├── lib/                      Ticket SVG / JPG helpers
-├── public/index.html         Event portal
-├── public/event.html         Checkout
-├── public/inbox.html         Mock confirmation email
-├── public/ticket-view.html   Unified e-ticket view
-├── public/order.html         Order confirmation
-├── data/tickets.db           Seeded inventory
-├── tickets/*.jpg             Pre-generated e-tickets
-├── deploy/ticketing.service  systemd unit for EC2
-└── .github/workflows/        Deploy to EC2 on push to main
+├── server.js                      Express origin (checkout + ticket JPG)
+├── seed.js                        SQLite + JPG generation
+├── lib/                           Ticket SVG / JPG helpers
+├── public/index.html              Event portal
+├── public/event.html              Checkout
+├── public/inbox.html              Mock confirmation email
+├── public/ticket-view.html        Unified e-ticket view
+├── public/order.html              Order confirmation
+├── data/tickets.db                Seeded inventory
+├── tickets/*.jpg                  Pre-generated e-tickets
+├── deploy/ticketing-demo.service  Production systemd unit (/opt)
+├── deploy/ticketing.service       Legacy home-dir unit (unused)
+└── .github/workflows/             Deploy to EC2 on push to main
 ```

@@ -37,24 +37,32 @@ jobs:
             set -euo pipefail
             APP_DIR="${{ secrets.EC2_APP_DIR }}"
             if [ -z "$APP_DIR" ]; then
-              APP_DIR="$HOME/Ticketing-demo"
+              APP_DIR="/opt/ticketing-demo"
             fi
             SERVICE_NAME="${{ secrets.EC2_SERVICE_NAME }}"
             if [ -z "$SERVICE_NAME" ]; then
-              SERVICE_NAME="ticketing"
+              SERVICE_NAME="ticketing-demo"
             fi
 
-            echo "Deploying into $APP_DIR"
-            cd "$APP_DIR"
+            echo "Deploying into $APP_DIR (service=$SERVICE_NAME)"
+            sudo mkdir -p "$APP_DIR"
+            sudo git config --system --add safe.directory "$APP_DIR" || true
 
-            git fetch origin --tags --force
-            git checkout main
-            git reset --hard origin/main
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "Cloning fresh into $APP_DIR"
+              sudo git clone https://github.com/suppergriff/Ticketing-demo.git "$APP_DIR"
+            fi
+
+            cd "$APP_DIR"
+            # Detached/tag-only clones need an explicit heads fetch
+            sudo git fetch origin +refs/heads/*:refs/remotes/origin/* --tags --force
+            sudo git checkout -f -B main origin/main
+            sudo git reset --hard origin/main
 
             if [ -f package-lock.json ]; then
-              npm ci --omit=dev
+              sudo npm ci --omit=dev
             else
-              npm install --omit=dev
+              sudo npm install --omit=dev
             fi
 
             if systemctl list-unit-files "${SERVICE_NAME}.service" --no-legend | grep -q "${SERVICE_NAME}.service"; then
@@ -62,6 +70,9 @@ jobs:
               sudo systemctl --no-pager --full status "$SERVICE_NAME" || true
             else
               echo "WARNING: systemd unit ${SERVICE_NAME}.service not found."
-              echo "Install deploy/ticketing.service then: sudo systemctl enable --now ${SERVICE_NAME}"
+              echo "Install deploy/ticketing-demo.service then: sudo systemctl enable --now ${SERVICE_NAME}"
               exit 1
             fi
+
+            curl -sS "http://127.0.0.1:8787/api/health" || true
+            echo

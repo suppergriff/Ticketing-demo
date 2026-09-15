@@ -1,0 +1,15 @@
+[Unit]
+Description=NEXUS GATE Ticketing Demo
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ticketing-demo
+EnvironmentFile=/opt/ticketing-demo/.env
+Environment=PORT=8787
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
