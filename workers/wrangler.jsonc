@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "dynamic-ticket-worker",
+  "main": "dynamic-ticket-worker.js",
+  "compatibility_date": "2026-09-15",
+  "observability": {
+    "enabled": true
+  },
+  "kv_namespaces": [
+    {
+      "binding": "TICKETS_KV",
+      "id": "YOUR_KV_NAMESPACE_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "TICKETS_BUCKET",
+      "bucket_name": "tickets-bucket"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "ticketing-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare SA live demo: anti-scalper checkout + ticket check-in storage evolution",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js",
+    "seed:fast": "SEED_COUNT=200 node seed.js",
+    "dev:worker": "wrangler dev --config workers/wrangler.jsonc",
+    "deploy:worker": "wrangler deploy --config workers/wrangler.jsonc",
+    "kv:put": "wrangler kv bulk put data/kv-bulk.json --binding TICKETS_KV --config workers/wrangler.jsonc",
+    "test:scene1": "k6 run load-test-scene1-bot.js",
+    "test:scene1:secure": "k6 run load-test-scene1-bot-secure.js",
+    "test:scene2:stage1": "k6 run load-test-scene2-stage1.js",
+    "test:scene2:stage2": "k6 run load-test-scene2-stage2.js",
+    "test:scene2:stage3": "k6 run load-test-scene2-stage3.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.901.0",
+    "better-sqlite3": "^12.2.0",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.34.3",
+    "uqr": "^0.1.2"
+  }
+}

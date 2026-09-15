@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060a" />
+  <title>E-Ticket · NEXUS GATE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+SC:wght@700&family=Oxanium:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/theme.css" />
+  <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
+</head>
+<body class="nexus" x-data="ticketView()" x-init="boot()">
+  <header class="ui-layer page-pad max-w-5xl mx-auto py-4 sm:py-6 flex items-center justify-between gap-3 pt-[max(1rem,var(--safe-top))]">
+    <a href="/" class="flex items-center gap-2 sm:gap-3 min-w-0">
+      <span class="led-dot"></span>
+      <span class="display text-lg sm:text-xl tracking-[0.18em]">NEXUS<span class="holo">GATE</span></span>
+    </a>
+    <a class="text-[10px] sm:text-[11px] tracking-[0.16em] uppercase text-cyan-300" :href="inboxUrl">Inbox</a>
+  </header>
+
+  <main class="ui-layer page-pad pb-[calc(2rem+var(--safe-bottom))] max-w-5xl mx-auto">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <p class="text-[10px] sm:text-[11px] tracking-[0.28em] uppercase text-amber-300">E-ticket</p>
+        <h1 class="display text-[clamp(1.75rem,7vw,2.75rem)] mt-2 tracking-[0.04em]">Your e-ticket</h1>
+        <p class="text-slate-400 mt-2 text-sm">
+          Order <span class="text-cyan-300 font-mono" x-text="token"></span>
+          <span class="text-slate-600"> · </span>
+          <span class="zh-mark text-slate-500">王嘉尔</span>
+          <span class="text-slate-500"> Jackson Wang · MAGIC MAN</span>
+        </p>
+      </div>
+      <p class="text-[10px] tracking-[0.2em] uppercase text-slate-500">Present at the gate</p>
+    </div>
+
+    <div class="mt-6 sm:mt-8 neon-frame rounded-2xl sm:rounded-3xl p-3 sm:p-6 relative overflow-hidden">
+      <div class="glow-orb absolute -right-16 -top-16 w-48 h-48 rounded-full bg-fuchsia-500/15 blur-3xl"></div>
+      <div class="glow-orb absolute -left-12 bottom-0 w-40 h-40 rounded-full bg-cyan-400/10 blur-3xl"></div>
+
+      <div class="relative z-10 rounded-xl sm:rounded-2xl border border-cyan-300/20 bg-black/40 p-2 sm:p-4">
+        <div class="aspect-[2/1] w-full overflow-hidden rounded-lg sm:rounded-xl bg-[#070b12] flex items-center justify-center">
+          <p x-show="loading" class="text-xs tracking-[0.2em] uppercase text-slate-500">Loading ticket…</p>
+          <p x-show="!loading && error" class="text-sm text-rose-300 px-4 text-center" x-text="error"></p>
+          <template x-if="src">
+            <img
+              :src="src"
+              :alt="'E-ticket ' + token"
+              class="w-full h-full object-contain"
+              :class="loading || error ? 'hidden' : ''"
+              @load="onLoad()"
+              @error="onError()"
+            />
+          </template>
+        </div>
+      </div>
+
+      <div class="relative z-10 mt-4 flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-[11px] tracking-[0.14em] uppercase text-slate-500">
+        <span x-text="venueLine"></span>
+        <span x-text="dateLine"></span>
+      </div>
+    </div>
+
+    <div class="mt-5 sm:mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
+      <a class="btn-amber rounded-lg text-[10px] w-full sm:w-auto" :href="src || '#'" :download="token + '-ticket'" target="_blank" rel="noopener">Download</a>
+      <a class="btn-ghost rounded-lg text-[10px] w-full sm:w-auto" :href="inboxUrl">Back to email</a>
+      <a class="btn-cyan rounded-lg text-[10px] w-full sm:w-auto" :href="orderUrl">View order</a>
+    </div>
+  </main>
+
+  <script>
+    function ticketView() {
+      return {
+        token: "TKT-0001",
+        email: "hugriff88@gmail.com",
+        src: "",
+        loading: true,
+        error: "",
+        venueLine: "Singapore National Stadium",
+        dateLine: "Oct 15, 2026 · 20:00 SGT",
+        inboxUrl: "",
+        orderUrl: "",
+        async boot() {
+          const params = new URLSearchParams(location.search);
+          this.token = params.get("token") || "TKT-0001";
+          this.email = params.get("email") || "hugriff88@gmail.com";
+
+          try {
+            const cfg = await fetch("/api/config").then((r) => r.json());
+            if (cfg.event?.venue) this.venueLine = cfg.event.venue;
+            if (cfg.event?.date) this.dateLine = cfg.event.date;
+          } catch (_) {}
+
+          this.inboxUrl = `/inbox.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
+          this.orderUrl = `/order.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
+          this.loading = true;
+          this.error = "";
+          this.src = `/ticket/${this.token}.jpg?t=${Date.now()}`;
+        },
+        onLoad() {
+          this.loading = false;
+          this.error = "";
+        },
+        onError() {
+          if (!this.src) return;
+          this.loading = false;
+          this.error = "Ticket could not be loaded. Please go back to email and try again.";
+        },
+      };
+    }
+  </script>
+</body>
+</html>

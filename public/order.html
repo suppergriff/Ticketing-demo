@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060a" />
+  <title>Order · NEXUS GATE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+SC:wght@700&family=Oxanium:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/theme.css" />
+  <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
+</head>
+<body class="nexus" x-data="order()" x-init="boot()">
+  <header class="ui-layer page-pad max-w-5xl mx-auto py-4 sm:py-6 flex items-center justify-between gap-3 pt-[max(1rem,var(--safe-top))]">
+    <a href="/" class="flex items-center gap-2 sm:gap-3 min-w-0">
+      <span class="led-dot"></span>
+      <span class="display text-lg sm:text-xl tracking-[0.18em]">NEXUS<span class="holo">GATE</span></span>
+    </a>
+    <a href="/inbox.html" class="text-[10px] sm:text-[11px] tracking-[0.16em] uppercase text-cyan-300" :href="inboxUrl">Inbox</a>
+  </header>
+
+  <main class="ui-layer page-pad pb-[calc(2rem+var(--safe-bottom))] max-w-5xl mx-auto">
+    <p class="text-[10px] sm:text-[11px] tracking-[0.28em] uppercase text-amber-300">Order confirmed</p>
+    <h1 class="display text-[clamp(2rem,8vw,3.5rem)] mt-2 tracking-[0.04em]">You're in</h1>
+    <p class="text-slate-400 mt-3 text-sm">
+      Order <span class="text-cyan-300 font-mono" x-text="token"></span> · save or screenshot your e-ticket
+    </p>
+    <div class="mt-6 sm:mt-8 neon-frame rounded-2xl sm:rounded-3xl p-3 sm:p-6">
+      <img :src="img" :alt="token" class="w-full rounded-xl sm:rounded-2xl border border-cyan-300/20" />
+    </div>
+    <div class="mt-5 sm:mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
+      <a class="btn-amber rounded-lg text-[10px] w-full sm:w-auto" :href="ticketUrl">Open ticket</a>
+      <a class="btn-ghost rounded-lg text-[10px] w-full sm:w-auto" :href="inboxUrl">Open email</a>
+    </div>
+  </main>
+
+  <script>
+    function order() {
+      return {
+        token: "TKT-0001",
+        email: "hugriff88@gmail.com",
+        img: "",
+        ticketUrl: "",
+        inboxUrl: "",
+        boot() {
+          const params = new URLSearchParams(location.search);
+          this.token = params.get("token") || "TKT-0001";
+          this.email = params.get("email") || "hugriff88@gmail.com";
+          this.img = `/ticket/${this.token}.jpg`;
+          this.ticketUrl = `/ticket-view.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
+          this.inboxUrl = `/inbox.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
+        },
+      };
+    }
+  </script>
+</body>
+</html>

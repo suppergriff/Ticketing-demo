@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060a" />
+  <title>Inbox · Ticket confirmed</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+SC:wght@700&family=Oxanium:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/theme.css" />
+  <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
+</head>
+<body class="nexus" x-data="inbox()" x-init="boot()">
+  <header class="ui-layer page-pad py-4 flex items-center justify-between border-b border-white/10 pt-[max(1rem,var(--safe-top))]">
+    <a href="/" class="flex items-center gap-2 sm:gap-3 min-w-0">
+      <span class="led-dot"></span>
+      <span class="display tracking-[0.18em] text-lg">NEXUS<span class="holo">MAIL</span></span>
+    </a>
+    <p class="text-[10px] sm:text-[11px] tracking-[0.18em] uppercase text-slate-500">Inbox</p>
+  </header>
+
+  <div class="ui-layer inbox-shell">
+    <aside class="border-b md:border-b-0 md:border-r border-white/10 p-4 space-y-2 bg-black/30">
+      <p class="text-[10px] tracking-[0.3em] uppercase text-slate-500 px-2">Mailbox</p>
+      <button class="w-full text-left neon-frame rounded-2xl p-4">
+        <p class="text-[10px] text-cyan-300 tracking-[0.2em] uppercase">Nexus Gate</p>
+        <p class="text-sm mt-1 leading-5">[Ticket Confirmed] Jackson Wang · MAGIC MAN</p>
+        <p class="text-[11px] text-slate-500 mt-2 truncate" x-text="email"></p>
+      </button>
+      <div class="rounded-2xl p-4 text-slate-600 text-xs">
+        2 earlier notices
+      </div>
+    </aside>
+
+    <article class="page-pad py-6 sm:py-10 pb-[calc(2rem+var(--safe-bottom))]">
+      <div class="max-w-3xl neon-frame rounded-2xl sm:rounded-3xl overflow-hidden mx-auto">
+        <div class="px-4 sm:px-6 py-4 border-b border-white/10 flex flex-wrap justify-between gap-2 text-[10px] sm:text-[11px] tracking-[0.08em] text-slate-500">
+          <span class="break-all">From: tickets@nexus-gate.com</span>
+          <span class="break-all" x-text="email"></span>
+        </div>
+        <div class="p-5 sm:p-8">
+          <p class="text-[10px] sm:text-[11px] tracking-[0.25em] uppercase text-amber-300">Ticket confirmed</p>
+          <h1 class="mt-2">
+            <span class="zh-mark text-sm text-slate-400">王嘉尔</span>
+            <span class="display block text-2xl sm:text-4xl tracking-[0.06em] mt-1">Jackson Wang</span>
+            <span class="holo display block text-lg sm:text-xl mt-2 tracking-[0.14em]">MAGIC MAN World Tour</span>
+          </h1>
+          <p class="text-sm text-slate-400 mt-5 leading-7">
+            Order <span class="text-cyan-300 font-mono" x-text="token"></span> is ready.
+            Open your e-ticket before you reach the gate. Screenshot backup recommended.
+          </p>
+
+          <a href="/ticket-view.html?token=TKT-0001" :href="ticketUrl"
+             class="mt-7 block rounded-2xl p-4 sm:p-5 border border-amber-300/30 hover:bg-amber-400/5">
+            <p class="display text-base text-amber-200">Your e-ticket</p>
+            <p class="text-xs text-slate-400 mt-1">Present this at the gate</p>
+            <span class="btn-amber inline-flex mt-4 text-[10px] rounded-lg">Open ticket</span>
+          </a>
+
+          <a :href="orderUrl" class="btn-ghost inline-flex mt-7 text-[10px] rounded-lg">View order</a>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <script>
+    function inbox() {
+      return {
+        token: "TKT-0001",
+        email: "hugriff88@gmail.com",
+        ticketUrl: "",
+        orderUrl: "",
+        boot() {
+          const params = new URLSearchParams(location.search);
+          this.token = params.get("token") || "TKT-0001";
+          this.email = params.get("email") || "hugriff88@gmail.com";
+          this.ticketUrl = `/ticket-view.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
+          this.orderUrl = `/order.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
+        },
+      };
+    }
+  </script>
+</body>
+</html>

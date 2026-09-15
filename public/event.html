@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060a" />
+  <title>Buy tickets · NEXUS GATE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+SC:wght@700&family=Oxanium:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/theme.css" />
+  <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
+</head>
+<body class="nexus" x-data="dropLane()">
+  <header class="ui-layer page-pad max-w-6xl mx-auto py-4 sm:py-6 flex items-center justify-between gap-3 pt-[max(1rem,var(--safe-top))]">
+    <a href="/" class="flex items-center gap-2 sm:gap-3 min-w-0">
+      <span class="led-dot"></span>
+      <span class="display text-lg sm:text-xl tracking-[0.18em]">NEXUS<span class="holo">GATE</span></span>
+    </a>
+    <div class="flex items-center gap-3 text-[10px] sm:text-[11px] tracking-[0.14em] uppercase text-slate-500">
+      <span>On sale</span>
+    </div>
+  </header>
+
+  <main class="ui-layer page-pad page-bottom max-w-6xl mx-auto grid lg:grid-cols-2 gap-4 sm:gap-6">
+    <section class="neon-frame rounded-2xl sm:rounded-3xl p-5 sm:p-7">
+      <p class="text-[10px] sm:text-[11px] tracking-[0.28em] uppercase text-amber-300">Select section</p>
+      <h1 class="mt-2">
+        <span class="zh-mark text-sm text-slate-400">王嘉尔</span>
+        <span class="display block text-2xl sm:text-3xl tracking-[0.06em] mt-1">JACKSON WANG</span>
+        <span class="holo display block text-lg sm:text-xl mt-1 tracking-[0.14em]">MAGIC MAN</span>
+      </h1>
+      <p class="text-[11px] sm:text-xs text-slate-500 mt-2">Singapore National Stadium · Oct 15, 2026</p>
+      <p class="text-sm text-slate-400 mt-4 leading-6">
+        Popular sections sell out fast. Lock your seats as soon as you can.
+      </p>
+      <div class="grid grid-cols-4 gap-2 sm:gap-3 mt-6">
+        <template x-for="sec in sections" :key="sec">
+          <button type="button"
+            class="seat-btn rounded-xl border text-sm display"
+            :class="section === sec ? 'border-amber-300 bg-amber-300/10 text-amber-200' : 'border-white/10 text-slate-400'"
+            @click="section = sec"
+            x-text="sec"></button>
+        </template>
+      </div>
+      <div class="mt-6 h-36 sm:h-40 rounded-2xl border border-white/10 relative overflow-hidden scan-grid">
+        <div class="absolute inset-5 sm:inset-6 rounded-full border border-amber-400/30"></div>
+        <div class="absolute inset-10 sm:inset-12 rounded-full border border-amber-300/20"></div>
+        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] tracking-[0.3em] uppercase text-slate-500">STAGE</div>
+      </div>
+    </section>
+
+    <section class="neon-frame rounded-2xl sm:rounded-3xl p-5 sm:p-7">
+      <p class="text-[10px] sm:text-[11px] tracking-[0.28em] uppercase text-fuchsia-300">Checkout</p>
+      <h2 class="display text-2xl sm:text-3xl mt-2">Confirm order</h2>
+      <p class="text-sm text-slate-400 mt-3 leading-6">
+        Enter attendee details and the email that should receive your e-ticket.
+      </p>
+      <form class="mt-5 space-y-4" @submit.prevent="checkout()">
+        <label class="block text-[11px] tracking-[0.16em] uppercase text-slate-500">Holder
+          <input x-model="holder" class="mt-2" required autocomplete="name" />
+        </label>
+        <label class="block text-[11px] tracking-[0.16em] uppercase text-slate-500">Email for e-ticket
+          <input type="email" x-model="email" class="mt-2" required autocomplete="email" inputmode="email" />
+        </label>
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span>Section <span class="text-amber-300" x-text="section"></span></span>
+          <span>SGD 348.00</span>
+        </div>
+        <p class="text-xs text-rose-400" x-show="error" x-text="error"></p>
+        <button class="btn-amber w-full rounded-xl text-xs" :disabled="busy" type="submit">
+          <span x-show="!busy">Pay now</span>
+          <span x-show="busy">Holding seats…</span>
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    function dropLane() {
+      return {
+        sections: ["A", "B", "C", "D", "E", "F", "GA", "VIP"],
+        section: "A",
+        holder: "Griff HU",
+        email: "hugriff88@gmail.com",
+        busy: false,
+        error: "",
+        async checkout() {
+          this.error = "";
+          this.busy = true;
+          try {
+            const res = await fetch("/api/checkout", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: this.email,
+                holder_name: this.holder,
+                section: this.section,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              this.error =
+                data.error === "sold_out"
+                  ? "This section is sold out. Try another one."
+                  : data.error === "ip_rate_limited"
+                    ? "Too many attempts. Please wait a moment."
+                    : "Checkout failed. Please try again.";
+              return;
+            }
+            window.location.href = data.inboxUrl;
+          } catch (err) {
+            this.error = "Network error. Check your connection and retry.";
+          } finally {
+            this.busy = false;
+          }
+        },
+      };
+    }
+  </script>
+</body>
+</html>
