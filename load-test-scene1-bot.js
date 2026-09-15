@@ -21,11 +21,11 @@ export const options = {
   scenarios: {
     scalper_rush_cpu: {
       executor: "ramping-vus",
-      startVUs: 10,
+      startVUs: 200,
       stages: [
-        { duration: "15s", target: 40 },
-        { duration: "45s", target: 80 },
-        { duration: "15s", target: 0 },
+        { duration: "10s", target: 200 },
+        { duration: "20s", target: 300 },
+        { duration: "1s", target: 0 },
       ],
       gracefulRampDown: "10s",
     },
