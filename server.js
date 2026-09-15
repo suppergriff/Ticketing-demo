@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +13,7 @@ const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 8787);
 const FRAGILE = String(process.env.ORIGIN_FRAGILE || "1") !== "0";
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 3000);
-/** Sync CPU burn per /api/checkout (ms). 0 = off. Demo default when fragile. */
+/** CPU burn per /api/checkout (ms), via 2 child processes. 0 = off. Demo default when fragile. */
 const CHECKOUT_BURN_MS = Number(
   process.env.CHECKOUT_BURN_MS ?? (FRAGILE ? 200 : 0),
 );
@@ -57,15 +58,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Busy-loop on the Node main thread so k6 can peg CPU during checkout demos. */
-function burnCpu(ms) {
+/** Spawn 2 short-lived node -e loops so one checkout can peg both cores. */
+async function burnCpu(ms) {
   if (!ms || ms <= 0) return;
-  const end = Date.now() + ms;
-  let x = 0;
-  while (Date.now() < end) {
-    x ^= Math.imul(x + 1, 2654435761);
-  }
-  return x;
+  const script = `const e=Date.now()+${Number(ms)};let x=0;while(Date.now()<e)x^=Math.imul(x+1,2654435761)`;
+  const one = () =>
+    new Promise((resolve, reject) => {
+      const p = spawn(process.execPath, ["-e", script], { stdio: "ignore" });
+      p.on("exit", resolve);
+      p.on("error", reject);
+    });
+  await Promise.all([one(), one()]);
 }
 
 function exclusiveFragile(work) {
@@ -218,7 +221,7 @@ function runCheckoutTxn(res, { email, holderName, section, sessionId, fingerprin
  * Scene 1 · V1 — naked origin.
  * No Turnstile. Only a naive per-IP limiter that residential proxies defeat by rotating IPs.
  */
-app.post("/api/checkout", (req, res) => {
+app.post("/api/checkout", async (req, res) => {
   const body = parseCheckoutBody(req);
   res.set("X-Nexus-Checkout", "v1-naked");
 
@@ -234,7 +237,7 @@ app.post("/api/checkout", (req, res) => {
   }
 
   // Burn before DB so sold-out (409) requests still spike CPU under k6.
-  burnCpu(CHECKOUT_BURN_MS);
+  await burnCpu(CHECKOUT_BURN_MS);
 
   return runCheckoutTxn(res, body);
 });
