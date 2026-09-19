@@ -10,7 +10,7 @@
     {
       "binding": "TICKETS_KV",
       // Replace with the namespace id from the Cloudflare dashboard before connecting this repo.
-      "id": "YOUR_KV_NAMESPACE_ID"
+      "id": "a9ee461f2e8342218a913d23e378112a"
     }
   ],
   "routes": [
