@@ -299,6 +299,20 @@
     background: rgba(61, 255, 239, 0.16);
     color: #d9fffb;
   }
+  .nexusgate-chat-link {
+    color: #60efff;
+    text-decoration: underline;
+  }
+  .nexusgate-chat-login {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px 0;
+    color: #9aa4b8;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
   .nexusgate-chat-form {
     display: flex;
     gap: 8px;
@@ -346,6 +360,7 @@
       <button class="nexusgate-chat-close" id="nexusgate-chat-close" type="button" aria-label="Close">×</button>
     </header>
     <div class="nexusgate-chat-log" id="nexusgate-chat-log"></div>
+    <label class="nexusgate-chat-login"><input id="nexusgate-chat-login" type="checkbox" /> Signed in</label>
     <form class="nexusgate-chat-form" id="nexusgate-chat-form">
       <input class="nexusgate-chat-input" id="nexusgate-chat-input" type="text" placeholder="Ask about tickets…" autocomplete="off" />
       <button class="nexusgate-chat-send" type="submit">Send</button>
@@ -356,24 +371,77 @@
 </div>
 <script>
   (function () {
-    var WELCOME = "Hi! Need help with tickets, venue rules or transfer? Ask me anything.\nWe support English, Español, Français, Deutsch.";
+    var WELCOME = "Hi! Need help with tickets, venue rules or transfer? Ask me anything.";
     var panel = document.getElementById("nexusgate-chat-panel");
     var log = document.getElementById("nexusgate-chat-log");
     var form = document.getElementById("nexusgate-chat-form");
     var input = document.getElementById("nexusgate-chat-input");
+    var login = document.getElementById("nexusgate-chat-login");
+    var sendButton = form.querySelector("button");
     var greeted = false;
+    var sending = false;
+
+    function sessionId() {
+      var key = "nexusgate-chat-session";
+      var id = localStorage.getItem(key);
+      if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem(key, id);
+      }
+      return id;
+    }
+
+    function supportUrl() {
+      if (location.hostname === "ticket-01.griffhu.top") return "/api/support";
+      return "https://ticket-01.griffhu.top/api/support";
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, function (char) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
+      });
+    }
+
+    function linkifyText(text) {
+      return escapeHtml(text).replace(/https:\/\/[^\s<]+/g, function (url) {
+        var clean = url.replace(/[),.;]+$/, "");
+        var trail = url.slice(clean.length);
+        return '<a class="nexusgate-chat-link" href="' + clean + '" target="_blank" rel="noopener noreferrer">' + clean + "</a>" + trail;
+      });
+    }
 
     function addMessage(text, role) {
       var bubble = document.createElement("div");
       bubble.className = "nexusgate-chat-bubble nexusgate-chat-bubble-" + role;
-      bubble.textContent = text;
+      bubble.innerHTML = linkifyText(text);
       log.appendChild(bubble);
       log.scrollTop = log.scrollHeight;
     }
 
-    /* Mock reply. Replace this function with the Cloudflare Workers API later. */
-    function mockReply(question) {
-      return "Got it. I noted: \"" + question + "\". A specialist reply from the Workers API will land here next.";
+    function sendMessage(text) {
+      sending = true;
+      sendButton.disabled = true;
+      fetch(supportUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sessionId(),
+          message: text,
+          isLogin: login.checked,
+        }),
+      })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+          addMessage(data && data.reply ? data.reply : "Sorry, support is unavailable right now. Please try again.", "bot");
+        })
+        .catch(function () {
+          addMessage("Sorry, support is unavailable right now. Please try again.", "bot");
+        })
+        .finally(function () {
+          sending = false;
+          sendButton.disabled = false;
+          input.focus();
+        });
     }
 
     function openPanel() {
@@ -446,11 +514,10 @@
       event.preventDefault();
       var text = input.value.trim();
       if (!text) return;
+      if (sending) return;
       addMessage(text, "user");
       input.value = "";
-      window.setTimeout(function () {
-        addMessage(mockReply(text), "bot");
-      }, 400);
+      sendMessage(text);
     });
   })();
 </script>
