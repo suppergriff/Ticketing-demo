@@ -67,6 +67,19 @@ body.nexus::before {
   padding-right: max(1rem, var(--safe-right));
 }
 
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
+@media (min-width: 1280px) {
+  .page-pad {
+    padding-left: max(1.5rem, var(--safe-left));
+    padding-right: max(1.5rem, var(--safe-right));
+  }
+}
+
 .page-bottom {
   padding-bottom: calc(9rem + var(--safe-bottom));
 }
