@@ -7,7 +7,7 @@ export type SupportChunk = {
 export const CHUNKS: SupportChunk[] = [
   {
     id: "chunk-presale",
-    text: "Presale for Jackson Wang Magic Man Singapore concert starts Oct 8, 10AM SGT. Presale code will be sent to registered fan club members via email. Public sale starts Oct 10, 12PM SGT. Queue system will open 30 mins before sale start time.\nOfficial ticket purchase page: https://your-nexusgate.com/jackson-sg",
+    text: "Presale for Jackson Wang Magic Man Singapore concert starts Sep 8, 10AM SGT. Presale code will be sent to registered fan club members via email. Public sale starts Oct 10, 12PM SGT. Queue system will open 30 mins before sale start time.\nOfficial ticket purchase page: https://ticket-01.griffhu.top/event.html",
     metadata: { event_id: "jackson-sg-2026", city: "Singapore", category: "presale" },
   },
   {

@@ -8,7 +8,8 @@ declare global {
 
 const EVENT_ID = "jackson-sg-2026";
 const VENUE = "Singapore National Stadium";
-const TICKET_URL = "https://your-nexusgate.com/jackson-sg";
+const TICKET_URL = "https://ticket-01.griffhu.top/event.html";
+const LEGACY_TICKET_URL = "https://your-nexusgate.com/jackson-sg";
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAX_TURNS = 3;
 const MATCH_THRESHOLD = 0.45;
@@ -298,9 +299,13 @@ async function writeSession(env: Env, sessionId: string, history: Turn[], user: 
   });
 }
 
+function withoutTicketUrls(reply: string): string {
+  return reply.split(TICKET_URL).join("").split(LEGACY_TICKET_URL).join("");
+}
+
 function stripTicketLink(reply: string, message: string): string {
-  if (asksToBuy(message)) return reply;
-  return reply.split(TICKET_URL).join("").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (asksToBuy(message)) return reply.split(LEGACY_TICKET_URL).join(TICKET_URL);
+  return withoutTicketUrls(reply).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function ensureVenueFacts(reply: string, matches: Match[], locale: Locale): string {
@@ -310,9 +315,9 @@ function ensureVenueFacts(reply: string, matches: Match[], locale: Locale): stri
 }
 
 function ensureTicketLink(reply: string, message: string, matches: Match[], locale: Locale): string {
-  const contextHasLink = matches.some((match) => match.text.includes(TICKET_URL));
+  const contextHasLink = matches.some((match) => match.text.includes(TICKET_URL) || match.text.includes(LEGACY_TICKET_URL));
   if (!asksToBuy(message) || !contextHasLink) return stripTicketLink(reply, message);
-  let next = reply;
+  let next = reply.split(LEGACY_TICKET_URL).join(TICKET_URL);
   const linkMarker = locale === "zh" ? "点击下面的链接打开购票页面" : "Click the link below to visit the ticket page";
   if (!next.includes(linkMarker)) next = `${next}\n${COPY[locale].link}`;
   if (!next.includes(TICKET_URL)) next = `${next}\n${TICKET_URL}`;

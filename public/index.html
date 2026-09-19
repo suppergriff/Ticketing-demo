@@ -391,10 +391,15 @@
     }
 
     function linkifyText(text) {
+      var ticketPage = "https://ticket-01.griffhu.top/event.html";
+      var legacyPage = "https://your-nexusgate.com/jackson-sg";
+      var label = /[\u4e00-\u9fff]/.test(text) ? "购票链接" : "Buy tickets";
       return escapeHtml(text).replace(/https:\/\/[^\s<]+/g, function (url) {
         var clean = url.replace(/[),.;]+$/, "");
         var trail = url.slice(clean.length);
-        return '<a class="nexusgate-chat-link" href="' + clean + '" target="_blank" rel="noopener noreferrer">' + clean + "</a>" + trail;
+        var href = clean === legacyPage ? ticketPage : clean;
+        var visible = clean === ticketPage || clean === legacyPage ? label : clean;
+        return '<a class="nexusgate-chat-link" href="' + href + '" target="_blank" rel="noopener noreferrer">' + visible + "</a>" + trail;
       });
     }
 
