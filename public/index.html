@@ -399,7 +399,8 @@
         var trail = url.slice(clean.length);
         var href = clean === legacyPage ? ticketPage : clean;
         var visible = clean === ticketPage || clean === legacyPage ? label : clean;
-        return '<a class="nexusgate-chat-link" href="' + href + '" target="_blank" rel="noopener noreferrer">' + visible + "</a>" + trail;
+        var extra = href === ticketPage ? "" : ' target="_blank" rel="noopener noreferrer"';
+        return '<a class="nexusgate-chat-link" href="' + href + '"' + extra + ">" + visible + "</a>" + trail;
       });
     }
 
