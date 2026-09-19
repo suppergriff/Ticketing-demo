@@ -48,9 +48,13 @@
           const params = new URLSearchParams(location.search);
           this.token = params.get("token") || "TKT-0001";
           this.email = params.get("email") || "hugriff88@gmail.com";
-          this.img = `/ticket/${this.token}.jpg`;
-          this.ticketUrl = `/ticket-view.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
-          this.inboxUrl = `/inbox.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
+          const worker = params.get("render") === "worker";
+          const lane = worker ? "&render=worker" : "";
+          this.img = worker
+            ? `/ticket-dynamic?token=${encodeURIComponent(this.token)}`
+            : `/ticket/${this.token}.jpg`;
+          this.ticketUrl = `/ticket-view.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}${lane}`;
+          this.inboxUrl = `/inbox.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}${lane}`;
         },
       };
     }

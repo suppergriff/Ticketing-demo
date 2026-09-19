@@ -9,13 +9,14 @@
   "kv_namespaces": [
     {
       "binding": "TICKETS_KV",
+      // Replace with the namespace id from the Cloudflare dashboard before connecting this repo.
       "id": "YOUR_KV_NAMESPACE_ID"
     }
   ],
-  "r2_buckets": [
+  "routes": [
     {
-      "binding": "TICKETS_BUCKET",
-      "bucket_name": "tickets-bucket"
+      "pattern": "ticket-01.griffhu.top/ticket-dynamic*",
+      "zone_name": "griffhu.top"
     }
   ]
 }

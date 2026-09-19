@@ -19,6 +19,7 @@
       <span class="display text-lg sm:text-xl tracking-[0.18em]">NEXUS<span class="holo">GATE</span></span>
     </a>
     <div class="flex items-center gap-3 text-[10px] sm:text-[11px] tracking-[0.14em] uppercase text-slate-500">
+      <span x-show="workerRender" class="text-fuchsia-300">Workers ticket</span>
       <span>On sale</span>
     </div>
   </header>
@@ -86,6 +87,7 @@
         email: "hugriff88@gmail.com",
         busy: false,
         error: "",
+        workerRender: new URLSearchParams(location.search).get("render") === "worker",
         async checkout() {
           this.error = "";
           this.busy = true;
@@ -109,7 +111,8 @@
                     : "Checkout failed. Please try again.";
               return;
             }
-            window.location.href = data.inboxUrl;
+            const lane = this.workerRender ? "&render=worker" : "";
+            window.location.href = data.inboxUrl + lane;
           } catch (err) {
             this.error = "Network error. Check your connection and retry.";
           } finally {

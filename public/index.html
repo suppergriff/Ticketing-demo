@@ -33,6 +33,7 @@
     </a>
     <nav class="flex gap-3 sm:gap-5 text-[10px] sm:text-xs tracking-[0.14em] uppercase text-slate-400 overflow-x-auto max-w-[58%] sm:max-w-none">
       <a href="/event.html" class="hover:text-amber-300 shrink-0">Buy</a>
+      <a href="/event.html?render=worker" class="hover:text-fuchsia-300 shrink-0">Workers</a>
       <a href="/inbox.html?token=TKT-0001&email=hugriff88@gmail.com" class="hover:text-cyan-300 shrink-0">Inbox</a>
       <a href="/order.html?token=TKT-0001&email=hugriff88@gmail.com" class="hover:text-cyan-300 shrink-0">Ticket</a>
     </nav>
@@ -105,6 +106,7 @@
 
         <div class="mt-8 hidden md:flex flex-wrap gap-3">
           <a href="/event.html" class="btn-amber rounded-xl text-xs">Buy tickets</a>
+          <a href="/event.html?render=worker" class="btn-magenta rounded-xl text-xs">Buy · Workers</a>
           <a href="/inbox.html?token=TKT-0001&email=hugriff88@gmail.com" class="btn-ghost rounded-xl text-xs">My e-ticket</a>
         </div>
       </div>
@@ -129,14 +131,18 @@
     </section>
 
     <section class="grid md:grid-cols-2 gap-4 sm:gap-6 mt-5 sm:mt-6">
-      <a href="/event.html" class="neon-frame rounded-2xl sm:rounded-3xl p-5 sm:p-8 block hover:border-amber-300/40 transition">
+      <div class="neon-frame rounded-2xl sm:rounded-3xl p-5 sm:p-8">
         <p class="text-[10px] sm:text-[11px] tracking-[0.28em] uppercase text-amber-300">Tickets</p>
         <h2 class="display text-2xl sm:text-3xl mt-2">Get your seats</h2>
         <p class="text-sm text-slate-400 mt-3 leading-6">
           Pick a section, enter attendee details, and complete payment. Your e-ticket is emailed instantly.
+          Workers renders the ticket at the edge instead of a pre-built JPG.
         </p>
-        <span class="btn-amber inline-flex mt-6 text-[10px] rounded-lg">Buy tickets</span>
-      </a>
+        <div class="mt-6 flex flex-wrap gap-3">
+          <a href="/event.html" class="btn-amber inline-flex text-[10px] rounded-lg">Buy tickets</a>
+          <a href="/event.html?render=worker" class="btn-magenta inline-flex text-[10px] rounded-lg">Buy · Workers</a>
+        </div>
+      </div>
 
       <a href="/inbox.html?token=TKT-0001&email=hugriff88@gmail.com" class="neon-frame rounded-2xl sm:rounded-3xl p-5 sm:p-8 block hover:border-fuchsia-400/40 transition">
         <p class="text-[10px] sm:text-[11px] tracking-[0.28em] uppercase text-fuchsia-300">E-ticket</p>
@@ -149,8 +155,9 @@
     </section>
   </main>
 
-  <div class="mobile-cta">
+  <div class="mobile-cta flex flex-col gap-2">
     <a href="/event.html" class="btn-amber w-full rounded-xl text-xs">Buy tickets</a>
+    <a href="/event.html?render=worker" class="btn-magenta w-full rounded-xl text-xs">Buy · Workers</a>
   </div>
 </body>
 </html>

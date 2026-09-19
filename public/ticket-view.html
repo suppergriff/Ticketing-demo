@@ -93,11 +93,15 @@
             if (cfg.event?.date) this.dateLine = cfg.event.date;
           } catch (_) {}
 
-          this.inboxUrl = `/inbox.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
-          this.orderUrl = `/order.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
+          const worker = params.get("render") === "worker";
+          const lane = worker ? "&render=worker" : "";
+          this.inboxUrl = `/inbox.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}${lane}`;
+          this.orderUrl = `/order.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}${lane}`;
           this.loading = true;
           this.error = "";
-          this.src = `/ticket/${this.token}.jpg?t=${Date.now()}`;
+          this.src = worker
+            ? `/ticket-dynamic?token=${encodeURIComponent(this.token)}`
+            : `/ticket/${this.token}.jpg?t=${Date.now()}`;
         },
         onLoad() {
           this.loading = false;

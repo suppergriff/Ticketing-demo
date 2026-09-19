@@ -76,8 +76,9 @@
           const params = new URLSearchParams(location.search);
           this.token = params.get("token") || "TKT-0001";
           this.email = params.get("email") || "hugriff88@gmail.com";
-          this.ticketUrl = `/ticket-view.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
-          this.orderUrl = `/order.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}`;
+          const lane = params.get("render") === "worker" ? "&render=worker" : "";
+          this.ticketUrl = `/ticket-view.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}${lane}`;
+          this.orderUrl = `/order.html?token=${encodeURIComponent(this.token)}&email=${encodeURIComponent(this.email)}${lane}`;
         },
       };
     }
