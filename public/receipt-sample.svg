@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="760" viewBox="0 0 360 760" role="img" aria-label="Sales receipt">
+  <rect width="360" height="760" fill="#f7f5f0"/>
+  <g fill="#1c1c1c" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <text x="180" y="48" text-anchor="middle" font-size="18" font-weight="700" letter-spacing="2">NEXUS GATE</text>
+    <text x="180" y="70" text-anchor="middle" font-size="11">Singapore National Stadium</text>
+    <text x="180" y="88" text-anchor="middle" font-size="11">UEN 202612345K</text>
+
+    <text x="180" y="124" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="1.4">SALES RECEIPT</text>
+    <text x="28" y="146" font-size="11" fill="#1c1c1c">--------------------------------</text>
+
+    <text x="28" y="172" font-size="12">Receipt</text>
+    <text x="332" y="172" text-anchor="end" font-size="12">RCP-20481</text>
+    <text x="28" y="194" font-size="12">Order</text>
+    <text x="332" y="194" text-anchor="end" font-size="12">NG-SG-20481</text>
+    <text x="28" y="216" font-size="12">Date</text>
+    <text x="332" y="216" text-anchor="end" font-size="12">19 Sep 2026</text>
+    <text x="332" y="234" text-anchor="end" font-size="12">17:24 SGT</text>
+    <text x="28" y="258" font-size="12">Sold to</text>
+    <text x="332" y="258" text-anchor="end" font-size="12">Alex Chen</text>
+    <text x="28" y="280" font-size="12">Email</text>
+    <text x="332" y="280" text-anchor="end" font-size="12">fan@example.com</text>
+
+    <text x="28" y="312" font-size="12" font-weight="700">Jackson Wang</text>
+    <text x="28" y="332" font-size="12">MAGIC MAN World Tour</text>
+    <text x="28" y="354" font-size="12">15 Oct 2026  20:00 SGT</text>
+    <text x="28" y="376" font-size="12">Section B   Row 12   Seat 8</text>
+    <text x="28" y="398" font-size="12">Ticket</text>
+    <text x="332" y="398" text-anchor="end" font-size="12">TKT-0001</text>
+
+    <text x="28" y="426" font-size="11">--------------------------------</text>
+    <text x="28" y="452" font-size="12">1  Reserved seat</text>
+    <text x="332" y="452" text-anchor="end" font-size="12">288.00</text>
+    <text x="28" y="474" font-size="12">   Booking fee</text>
+    <text x="332" y="474" text-anchor="end" font-size="12">12.00</text>
+    <text x="188" y="500" font-size="11">---------------</text>
+    <text x="28" y="524" font-size="12">Subtotal</text>
+    <text x="332" y="524" text-anchor="end" font-size="12">300.00</text>
+    <text x="28" y="546" font-size="12">GST 9%</text>
+    <text x="332" y="546" text-anchor="end" font-size="12">27.00</text>
+    <text x="28" y="574" font-size="13" font-weight="700">TOTAL SGD</text>
+    <text x="332" y="574" text-anchor="end" font-size="13" font-weight="700">327.00</text>
+
+    <text x="28" y="608" font-size="11">--------------------------------</text>
+    <text x="28" y="634" font-size="12">Paid</text>
+    <text x="332" y="634" text-anchor="end" font-size="12">Visa **** 4242</text>
+    <text x="28" y="656" font-size="12">Auth</text>
+    <text x="332" y="656" text-anchor="end" font-size="12">884219</text>
+
+    <text x="180" y="692" text-anchor="middle" font-size="11">This receipt is not a ticket.</text>
+    <text x="180" y="710" text-anchor="middle" font-size="11">Show your e-ticket at entry.</text>
+    <text x="180" y="738" text-anchor="middle" font-size="12">Thank you</text>
+  </g>
+</svg>

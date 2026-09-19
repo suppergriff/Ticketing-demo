@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "ticketing-receipt",
+  "main": "index.js",
+  "compatibility_date": "2026-09-19",
+  "workers_dev": false,
+  "observability": {
+    "enabled": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "RECEIPTS",
+      "bucket_name": "nexus-receipts"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "ticket-01.griffhu.top/receipt*",
+      "zone_name": "griffhu.top"
+    }
+  ]
+}

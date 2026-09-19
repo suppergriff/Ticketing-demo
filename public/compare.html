@@ -63,12 +63,23 @@
           />
         </div>
       </section>
-
-      <section class="neon-frame rounded-2xl sm:rounded-3xl p-3 sm:p-5" aria-label="My receipts">
-        <p class="text-[10px] tracking-[0.22em] uppercase text-amber-200/80">My receipts</p>
-        <div class="mt-4 aspect-[2/1] rounded-xl bg-[#12100a] border border-amber-200/25 flex items-center justify-center overflow-hidden"></div>
-      </section>
     </div>
+
+    <section class="neon-frame rounded-2xl sm:rounded-3xl p-3 sm:p-5 mt-4 sm:mt-6 md:max-w-md md:mx-auto" aria-label="My receipts">
+      <p class="text-[10px] tracking-[0.22em] uppercase text-amber-200/80">My receipts</p>
+      <div class="mt-4 flex justify-center px-1 pb-1">
+        <p x-show="receipt.loading" class="text-xs tracking-[0.16em] uppercase text-slate-500 py-16">Loading…</p>
+        <p x-show="!receipt.loading && receipt.error" class="text-sm text-rose-300 px-4 py-16 text-center" x-text="receipt.error"></p>
+        <img
+          x-show="receipt.src && !receipt.error"
+          :src="receipt.src"
+          alt="Sales receipt"
+          class="w-[min(100%,18rem)] h-auto rounded-sm bg-[#f7f5f0] shadow-[0_14px_28px_rgba(0,0,0,0.5)]"
+          @load="receipt.loading = false"
+          @error="fail('receipt')"
+        />
+      </div>
+    </section>
 
     <div class="mt-6 flex flex-wrap gap-3">
       <button type="button" class="btn-ghost rounded-lg text-[10px]" @click="boot()">Reload both</button>
@@ -83,17 +94,27 @@
         token: "TKT-0001",
         origin: { src: "", loading: true, error: "" },
         worker: { src: "", loading: true, error: "" },
+        receipt: { src: "", loading: true, error: "" },
         boot() {
           const params = new URLSearchParams(location.search);
           this.token = params.get("token") || "TKT-0001";
           const bust = Date.now();
+          const token = encodeURIComponent(this.token);
           this.origin = {
             src: `/ticket/${this.token}.jpg?t=${bust}`,
             loading: true,
             error: "",
           };
           this.worker = {
-            src: `/ticket-dynamic?token=${encodeURIComponent(this.token)}&t=${bust}`,
+            src: `/ticket-dynamic?token=${token}&t=${bust}`,
+            loading: true,
+            error: "",
+          };
+          const receiptHost = location.hostname === "127.0.0.1" || location.hostname === "localhost"
+            ? "https://ticket-01.griffhu.top"
+            : "";
+          this.receipt = {
+            src: `${receiptHost}/receipt?token=${token}&t=${bust}`,
             loading: true,
             error: "",
           };
@@ -103,7 +124,9 @@
           pane.loading = false;
           pane.error = side === "origin"
             ? "Origin ticket could not be loaded. The source is queued."
-            : "Workers ticket could not be loaded.";
+            : side === "receipt"
+              ? "Receipt could not be loaded."
+              : "Workers ticket could not be loaded.";
         },
       };
     }
