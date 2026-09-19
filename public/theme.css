@@ -68,7 +68,7 @@ body.nexus::before {
 }
 
 .page-bottom {
-  padding-bottom: calc(5.5rem + var(--safe-bottom));
+  padding-bottom: calc(9rem + var(--safe-bottom));
 }
 
 @media (min-width: 768px) {

@@ -35,7 +35,7 @@
       <a href="/event.html" class="hover:text-amber-300 shrink-0">Buy</a>
       <a href="/event.html?render=worker" class="hover:text-fuchsia-300 shrink-0">Workers</a>
       <a href="/inbox.html?token=TKT-0001&email=hugriff88@gmail.com" class="hover:text-cyan-300 shrink-0">Inbox</a>
-      <a href="/order.html?token=TKT-0001&email=hugriff88@gmail.com" class="hover:text-cyan-300 shrink-0">Ticket</a>
+      <a href="/compare.html?token=TKT-0001" class="hover:text-cyan-300 shrink-0">Compare</a>
     </nav>
   </header>
 
@@ -107,7 +107,7 @@
         <div class="mt-8 hidden md:flex flex-wrap gap-3">
           <a href="/event.html" class="btn-amber rounded-xl text-xs">Buy tickets</a>
           <a href="/event.html?render=worker" class="btn-magenta rounded-xl text-xs">Buy · Workers</a>
-          <a href="/inbox.html?token=TKT-0001&email=hugriff88@gmail.com" class="btn-ghost rounded-xl text-xs">My e-ticket</a>
+          <a href="/compare.html?token=TKT-0001" class="btn-ghost rounded-xl text-xs">My tickets</a>
         </div>
       </div>
     </section>
@@ -144,20 +144,25 @@
         </div>
       </div>
 
-      <a href="/inbox.html?token=TKT-0001&email=hugriff88@gmail.com" class="neon-frame rounded-2xl sm:rounded-3xl p-5 sm:p-8 block hover:border-fuchsia-400/40 transition">
+      <div class="neon-frame rounded-2xl sm:rounded-3xl p-5 sm:p-8">
         <p class="text-[10px] sm:text-[11px] tracking-[0.28em] uppercase text-fuchsia-300">E-ticket</p>
-        <h2 class="display text-2xl sm:text-3xl mt-2">Arrive with email</h2>
+        <h2 class="display text-2xl sm:text-3xl mt-2">Same ticket, two paths</h2>
         <p class="text-sm text-slate-400 mt-3 leading-6">
-          After payment, open the confirmation in your inbox and present the e-ticket at the gate.
+          Open both renders of TKT-0001. Under load the origin JPG stalls, while the Workers ticket still loads.
         </p>
-        <span class="btn-magenta inline-flex mt-6 text-[10px] rounded-lg">Open inbox</span>
-      </a>
+        <div class="mt-6 flex flex-wrap gap-3">
+          <a href="/ticket-view.html?token=TKT-0001" class="btn-amber inline-flex text-[10px] rounded-lg">Origin ticket</a>
+          <a href="/ticket-view.html?token=TKT-0001&render=worker" class="btn-magenta inline-flex text-[10px] rounded-lg">Workers ticket</a>
+          <a href="/compare.html?token=TKT-0001" class="btn-ghost inline-flex text-[10px] rounded-lg">Compare</a>
+        </div>
+      </div>
     </section>
   </main>
 
   <div class="mobile-cta flex flex-col gap-2">
     <a href="/event.html" class="btn-amber w-full rounded-xl text-xs">Buy tickets</a>
     <a href="/event.html?render=worker" class="btn-magenta w-full rounded-xl text-xs">Buy · Workers</a>
+    <a href="/compare.html?token=TKT-0001" class="btn-ghost w-full rounded-xl text-xs">My tickets</a>
   </div>
 </body>
 </html>

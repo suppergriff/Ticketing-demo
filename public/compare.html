@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060a" />
+  <title>Compare tickets · NEXUS GATE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+SC:wght@700&family=Oxanium:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/theme.css" />
+  <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
+</head>
+<body class="nexus" x-data="compareTickets()" x-init="boot()">
+  <header class="ui-layer page-pad max-w-6xl mx-auto py-4 sm:py-6 flex items-center justify-between gap-3 pt-[max(1rem,var(--safe-top))]">
+    <a href="/" class="flex items-center gap-2 sm:gap-3 min-w-0">
+      <span class="led-dot"></span>
+      <span class="display text-lg sm:text-xl tracking-[0.18em]">NEXUS<span class="holo">GATE</span></span>
+    </a>
+    <a href="/" class="text-[10px] sm:text-[11px] tracking-[0.16em] uppercase text-cyan-300">Home</a>
+  </header>
+
+  <main class="ui-layer page-pad pb-[calc(2rem+var(--safe-bottom))] max-w-6xl mx-auto">
+    <p class="text-[10px] sm:text-[11px] tracking-[0.28em] uppercase text-amber-300">Same order · two renders</p>
+    <h1 class="display text-[clamp(1.75rem,7vw,2.75rem)] mt-2 tracking-[0.04em]">Compare tickets</h1>
+    <p class="text-slate-400 mt-2 text-sm">
+      Order <span class="text-cyan-300 font-mono" x-text="token"></span>.
+      Left is the origin JPG. Right is rendered by the Cloudflare Worker.
+    </p>
+
+    <div class="mt-6 sm:mt-8 grid md:grid-cols-2 gap-4 sm:gap-6">
+      <section class="neon-frame rounded-2xl sm:rounded-3xl p-3 sm:p-5">
+        <p class="text-[10px] tracking-[0.22em] uppercase text-amber-300">Origin</p>
+        <p class="text-xs text-slate-500 mt-1">/ticket/TKT-xxxx.jpg · EC2</p>
+        <div class="mt-4 aspect-[2/1] rounded-xl bg-[#070b12] border border-cyan-300/20 flex items-center justify-center overflow-hidden">
+          <p x-show="origin.loading" class="text-xs tracking-[0.16em] uppercase text-slate-500">Loading…</p>
+          <p x-show="!origin.loading && origin.error" class="text-sm text-rose-300 px-4 text-center" x-text="origin.error"></p>
+          <img
+            x-show="origin.src && !origin.error"
+            :src="origin.src"
+            alt="Origin ticket"
+            class="w-full h-full object-contain"
+            @load="origin.loading = false"
+            @error="fail('origin')"
+          />
+        </div>
+      </section>
+
+      <section class="neon-frame rounded-2xl sm:rounded-3xl p-3 sm:p-5">
+        <p class="text-[10px] tracking-[0.22em] uppercase text-fuchsia-300">Workers</p>
+        <p class="text-xs text-slate-500 mt-1">/ticket-dynamic · Cloudflare</p>
+        <div class="mt-4 aspect-[2/1] rounded-xl bg-[#070b12] border border-fuchsia-300/20 flex items-center justify-center overflow-hidden">
+          <p x-show="worker.loading" class="text-xs tracking-[0.16em] uppercase text-slate-500">Loading…</p>
+          <p x-show="!worker.loading && worker.error" class="text-sm text-rose-300 px-4 text-center" x-text="worker.error"></p>
+          <img
+            x-show="worker.src && !worker.error"
+            :src="worker.src"
+            alt="Workers ticket"
+            class="w-full h-full object-contain"
+            @load="worker.loading = false"
+            @error="fail('worker')"
+          />
+        </div>
+      </section>
+    </div>
+
+    <div class="mt-6 flex flex-wrap gap-3">
+      <button type="button" class="btn-ghost rounded-lg text-[10px]" @click="boot()">Reload both</button>
+      <a class="btn-amber rounded-lg text-[10px]" :href="'/ticket-view.html?token=' + token">Open origin only</a>
+      <a class="btn-magenta rounded-lg text-[10px]" :href="'/ticket-view.html?token=' + token + '&render=worker'">Open Workers only</a>
+    </div>
+  </main>
+
+  <script>
+    function compareTickets() {
+      return {
+        token: "TKT-0001",
+        origin: { src: "", loading: true, error: "" },
+        worker: { src: "", loading: true, error: "" },
+        boot() {
+          const params = new URLSearchParams(location.search);
+          this.token = params.get("token") || "TKT-0001";
+          const bust = Date.now();
+          this.origin = {
+            src: `/ticket/${this.token}.jpg?t=${bust}`,
+            loading: true,
+            error: "",
+          };
+          this.worker = {
+            src: `/ticket-dynamic?token=${encodeURIComponent(this.token)}&t=${bust}`,
+            loading: true,
+            error: "",
+          };
+        },
+        fail(side) {
+          const pane = this[side];
+          pane.loading = false;
+          pane.error = side === "origin"
+            ? "Origin ticket could not be loaded. The source is queued."
+            : "Workers ticket could not be loaded.";
+        },
+      };
+    }
+  </script>
+</body>
+</html>
