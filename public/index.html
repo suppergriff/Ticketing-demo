@@ -351,7 +351,7 @@
     </header>
     <div class="nexusgate-chat-log" id="nexusgate-chat-log"></div>
     <form class="nexusgate-chat-form" id="nexusgate-chat-form">
-      <input class="nexusgate-chat-input" id="nexusgate-chat-input" type="text" placeholder="Ask about tickets…" autocomplete="off" />
+      <input class="nexusgate-chat-input" id="nexusgate-chat-input" type="text" placeholder="Ask about tickets… / 询问票务…" autocomplete="off" />
       <button class="nexusgate-chat-send" type="submit">Send</button>
     </form>
   </section>
@@ -360,7 +360,7 @@
 </div>
 <script>
   (function () {
-    var WELCOME = "Hi! Need help with tickets, venue rules or transfer? Ask me anything.";
+    var WELCOME = "Hi! Need help with tickets, venue rules or transfer? Ask me anything.\n需要咨询门票、场馆规则或转票吗？直接问我即可。";
     var panel = document.getElementById("nexusgate-chat-panel");
     var log = document.getElementById("nexusgate-chat-log");
     var form = document.getElementById("nexusgate-chat-form");
@@ -420,10 +420,10 @@
       })
         .then(function (response) { return response.json(); })
         .then(function (data) {
-          addMessage(data && data.reply ? data.reply : "Sorry, support is unavailable right now. Please try again.", "bot");
+          addMessage(data && data.reply ? data.reply : "Sorry, support is unavailable right now. Please try again.\n客服暂时无法回复，请再试一次。", "bot");
         })
         .catch(function () {
-          addMessage("Sorry, support is unavailable right now. Please try again.", "bot");
+          addMessage("Sorry, support is unavailable right now. Please try again.\n客服暂时无法回复，请再试一次。", "bot");
         })
         .finally(function () {
           sending = false;
