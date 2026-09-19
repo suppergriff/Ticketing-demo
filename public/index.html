@@ -303,16 +303,6 @@
     color: #60efff;
     text-decoration: underline;
   }
-  .nexusgate-chat-login {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px 0;
-    color: #9aa4b8;
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
   .nexusgate-chat-form {
     display: flex;
     gap: 8px;
@@ -360,7 +350,6 @@
       <button class="nexusgate-chat-close" id="nexusgate-chat-close" type="button" aria-label="Close">×</button>
     </header>
     <div class="nexusgate-chat-log" id="nexusgate-chat-log"></div>
-    <label class="nexusgate-chat-login"><input id="nexusgate-chat-login" type="checkbox" /> Signed in</label>
     <form class="nexusgate-chat-form" id="nexusgate-chat-form">
       <input class="nexusgate-chat-input" id="nexusgate-chat-input" type="text" placeholder="Ask about tickets…" autocomplete="off" />
       <button class="nexusgate-chat-send" type="submit">Send</button>
@@ -376,7 +365,6 @@
     var log = document.getElementById("nexusgate-chat-log");
     var form = document.getElementById("nexusgate-chat-form");
     var input = document.getElementById("nexusgate-chat-input");
-    var login = document.getElementById("nexusgate-chat-login");
     var sendButton = form.querySelector("button");
     var greeted = false;
     var sending = false;
@@ -427,7 +415,7 @@
         body: JSON.stringify({
           sessionId: sessionId(),
           message: text,
-          isLogin: login.checked,
+          isLogin: true,
         }),
       })
         .then(function (response) { return response.json(); })
