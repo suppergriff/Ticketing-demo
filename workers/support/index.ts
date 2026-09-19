@@ -12,6 +12,7 @@ const TICKET_URL = "https://your-nexusgate.com/jackson-sg";
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAX_TURNS = 3;
 const MATCH_THRESHOLD = 0.45;
+const GATEWAY_ID = "default";
 
 const UPSET_REPLY = "I notice you are upset, transferring you to human agent.";
 const HUMAN_REPLY =
@@ -40,6 +41,17 @@ const ALLOW_ORIGINS = new Set([
 type Role = "user" | "assistant";
 type Turn = { role: Role; content: string };
 type Match = { id: string; score: number; text: string };
+type GatewayStep = "embed" | "sentiment" | "answer" | "seed";
+
+function aiGateway(step: GatewayStep, sessionId?: string) {
+  return {
+    gateway: {
+      id: GATEWAY_ID,
+      collectLog: true,
+      metadata: sessionId ? { step, sessionId } : { step },
+    },
+  };
+}
 
 function corsHeaders(request: Request): Headers {
   const headers = new Headers();
@@ -91,8 +103,8 @@ function mockOrder(): string {
   ].join("\n");
 }
 
-async function embed(env: Env, text: string): Promise<number[]> {
-  const result = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [text] });
+async function embed(env: Env, text: string, step: "embed" | "seed", sessionId?: string): Promise<number[]> {
+  const result = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [text] }, aiGateway(step, sessionId));
   const data = result.data;
   const vector = data?.[0];
   if (!vector) throw new Error("embedding_empty");
@@ -130,8 +142,8 @@ function dedupe(matches: Match[]): Match[] {
   return kept;
 }
 
-async function retrieve(env: Env, message: string): Promise<Match[]> {
-  const vector = await embed(env, message);
+async function retrieve(env: Env, message: string, sessionId: string): Promise<Match[]> {
+  const vector = await embed(env, message, "embed", sessionId);
   if (isVenue(message)) {
     // Chunk 3 has no event_id, so a single event filter cannot return the venue rule.
     const eventRule = await search(env, vector, { event_id: EVENT_ID, category: "event-rule" }, 1);
@@ -159,8 +171,8 @@ function negativeScore(raw: unknown): number {
 
 const ANGER = /\b(angry|anger|upset|furious|terrible|hate|awful|worst|ridiculous|scam|disgusting|annoyed|mad)\b/i;
 
-async function isUpset(env: Env, message: string): Promise<boolean> {
-  const raw = await env.AI.run("@cf/huggingface/distilbert-sst-2-int8", { text: message });
+async function isUpset(env: Env, message: string, sessionId: string): Promise<boolean> {
+  const raw = await env.AI.run("@cf/huggingface/distilbert-sst-2-int8", { text: message }, aiGateway("sentiment", sessionId));
   const score = negativeScore(raw);
   // SST-2 scores ordinary questions as NEGATIVE above 0.7. The model still runs.
   // Hand off only when that score is high and the fan also uses upset language.
@@ -217,8 +229,8 @@ function ensureTicketLink(reply: string, message: string, matches: Match[]): str
   return next.trim();
 }
 
-async function answer(env: Env, message: string, history: Turn[], loggedIn: boolean): Promise<string> {
-  const matches = await retrieve(env, message);
+async function answer(env: Env, message: string, history: Turn[], loggedIn: boolean, sessionId: string): Promise<string> {
+  const matches = await retrieve(env, message, sessionId);
   const best = matches.reduce((max, match) => Math.max(max, match.score), 0);
   const known = isVenue(message) || isPresale(message) || isBenefit(message) || isEticket(message);
   console.log(JSON.stringify({ event: "support_retrieve", known, best, ids: matches.map((match) => match.id) }));
@@ -254,7 +266,7 @@ async function answer(env: Env, message: string, history: Turn[], loggedIn: bool
     ],
     max_tokens: 300,
     temperature: 0.1,
-  });
+  }, aiGateway("answer", sessionId));
   const reply = result.response?.trim() ?? "";
   if (!reply) return "Sorry, I don't have that information, I will transfer you to human agent.";
   return ensureVenueFacts(ensureTicketLink(reply, message, matches), matches);
@@ -265,7 +277,7 @@ async function seed(request: Request, env: Env): Promise<Response> {
   if (!env.SEED_TOKEN || token !== env.SEED_TOKEN) return json(request, { error: "unauthorized" }, 401);
   const ids: string[] = [];
   for (const chunk of CHUNKS) {
-    const values = await embed(env, chunk.text);
+    const values = await embed(env, chunk.text, "seed");
     await env.SUPPORT_INDEX.upsert([
       {
         id: chunk.id,
@@ -308,8 +320,8 @@ export default {
 
     try {
       const history = await readHistory(env, body.sessionId);
-      const upset = await isUpset(env, message);
-      const reply = upset ? UPSET_REPLY : await answer(env, message, history, body.isLogin === true);
+      const upset = await isUpset(env, message, body.sessionId);
+      const reply = upset ? UPSET_REPLY : await answer(env, message, history, body.isLogin === true, body.sessionId);
       await writeHistory(env, body.sessionId, history, message, reply);
       console.log(JSON.stringify({ event: "support_turn", upset }));
       return json(request, { reply });
