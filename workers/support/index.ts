@@ -75,6 +75,125 @@ function aiGateway(step: GatewayStep, sessionId?: string, language?: Locale) {
   };
 }
 
+class GuardrailReply extends Error {
+  readonly reply: string;
+
+  constructor(reply: string) {
+    super(reply);
+    this.name = "GuardrailReply";
+    this.reply = reply;
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function errorEntries(body: unknown): Array<{ code?: unknown; message?: unknown }> {
+  const errors = asRecord(body)?.errors;
+  if (!Array.isArray(errors)) return [];
+  return errors.filter((item): item is { code?: unknown; message?: unknown } => !!item && typeof item === "object");
+}
+
+function hasGuardrailCode(body: unknown): boolean {
+  return errorEntries(body).some((item) => {
+    const code = Number(item.code);
+    return code === 2016 || code === 2017;
+  });
+}
+
+function headerMarksGuardrail(headers: Headers): boolean {
+  for (const [key, value] of headers) {
+    if (!/guardrail/i.test(`${key}: ${value}`)) continue;
+    if (/block|2016|2017|unsafe/i.test(value)) return true;
+  }
+  return false;
+}
+
+function bodyMarksGuardrail(body: unknown): boolean {
+  const record = asRecord(body);
+  if (!record) return false;
+  for (const key of ["guardrails", "guardrail"]) {
+    const marker = record[key];
+    if (marker === true) return true;
+    const markerRecord = asRecord(marker);
+    if (!markerRecord) continue;
+    const action = typeof markerRecord.action === "string" ? markerRecord.action.toLowerCase() : "";
+    if (action === "block" || action === "blocked" || markerRecord.blocked === true) return true;
+  }
+  return false;
+}
+
+function guardrailMessage(body: unknown, rawText: string): string {
+  const record = asRecord(body);
+  const response = typeof record?.response === "string" ? record.response.trim() : "";
+  if (response) return response;
+  const nested = asRecord(record?.result);
+  const nestedResponse = typeof nested?.response === "string" ? nested.response.trim() : "";
+  if (nestedResponse) return nestedResponse;
+  const fromError = errorEntries(body)
+    .map((item) => (typeof item.message === "string" ? item.message.trim() : ""))
+    .find(Boolean);
+  if (fromError) return fromError;
+  return rawText.replace(/^\s*(?:2016|2017)\s*:\s*/, "").trim();
+}
+
+function isGuardrailBlock(status: number, headers: Headers, body: unknown): boolean {
+  return status === 424 || headerMarksGuardrail(headers) || hasGuardrailCode(body) || bodyMarksGuardrail(body);
+}
+
+function thrownGuardrailReply(error: unknown): GuardrailReply | null {
+  if (error instanceof GuardrailReply) return error;
+  const message = error instanceof Error ? error.message : "";
+  const parsed = (() => {
+    try {
+      return JSON.parse(message) as unknown;
+    } catch {
+      return null;
+    }
+  })();
+  if (!hasGuardrailCode(parsed) && !/\b2016\b|\b2017\b/.test(message) && !/security configurations/i.test(message)) return null;
+  const reply = guardrailMessage(parsed, message);
+  return reply ? new GuardrailReply(reply) : null;
+}
+
+async function runAi(
+  env: Env,
+  model: string,
+  inputs: Record<string, unknown>,
+  step: GatewayStep,
+  sessionId?: string,
+  language?: Locale,
+): Promise<any> {
+  let raw: Response;
+  try {
+    raw = (await env.AI.run(model, inputs, {
+      ...aiGateway(step, sessionId, language),
+      returnRawResponse: true,
+    })) as Response;
+  } catch (error) {
+    const blocked = thrownGuardrailReply(error);
+    if (blocked) throw blocked;
+    throw error;
+  }
+
+  const rawText = await raw.text();
+  let body: unknown = null;
+  try {
+    body = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    body = null;
+  }
+  if (isGuardrailBlock(raw.status, raw.headers, body)) {
+    const reply = guardrailMessage(body, rawText);
+    console.log(JSON.stringify({ event: "support_guardrail", step, status: raw.status }));
+    if (reply) throw new GuardrailReply(reply);
+  }
+  if (!raw.ok || body == null) throw new Error(rawText || "ai_failed");
+  return body;
+}
+
 function corsHeaders(request: Request): Headers {
   const headers = new Headers();
   const origin = request.headers.get("Origin");
@@ -126,7 +245,7 @@ function mockOrder(): string {
 }
 
 async function embed(env: Env, text: string, step: "embed" | "seed", sessionId?: string): Promise<number[]> {
-  const result = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [text] }, aiGateway(step, sessionId));
+  const result = await runAi(env, "@cf/baai/bge-base-en-v1.5", { text: [text] }, step, sessionId);
   const data = result.data;
   const vector = data?.[0];
   if (!vector) throw new Error("embedding_empty");
@@ -195,7 +314,7 @@ const ANGER = /\b(angry|anger|upset|furious|terrible|hate|awful|worst|ridiculous
 const ZH_ANGER = /生气|愤怒|太差|垃圾|骗子|气死|讨厌|糟糕/;
 
 async function isUpset(env: Env, message: string, sessionId: string): Promise<boolean> {
-  const raw = await env.AI.run("@cf/huggingface/distilbert-sst-2-int8", { text: message }, aiGateway("sentiment", sessionId, "en"));
+  const raw = await runAi(env, "@cf/huggingface/distilbert-sst-2-int8", { text: message }, "sentiment", sessionId, "en");
   const score = negativeScore(raw);
   // SST-2 scores ordinary English questions as NEGATIVE above 0.7.
   // Hand off only when that score is high and the fan also uses upset language.
@@ -223,7 +342,8 @@ function parseClassification(raw: string): Classification | null {
 
 async function classify(env: Env, message: string, sessionId: string): Promise<Classification> {
   try {
-    const result = await env.AI.run(
+    const result = await runAi(
+      env,
       "@cf/meta/llama-3.1-8b-instruct-fp8",
       {
         messages: [
@@ -237,11 +357,13 @@ async function classify(env: Env, message: string, sessionId: string): Promise<C
         max_tokens: 60,
         temperature: 0,
       },
-      aiGateway("classify", sessionId),
+      "classify",
+      sessionId,
     );
     const parsed = parseClassification(result.response ?? "");
     if (parsed) return parsed;
   } catch (error) {
+    if (error instanceof GuardrailReply) throw error;
     console.log(JSON.stringify({ event: "support_classify_failed", message: error instanceof Error ? error.message : "unknown" }));
   }
   return { lang: "en", confidence: 0, upset: false };
@@ -256,14 +378,18 @@ function resolveLocale(message: string, classified: Classification, previous?: L
 
 async function translateToEnglish(env: Env, text: string, sessionId: string): Promise<string> {
   try {
-    const result = await env.AI.run(
+    const result = await runAi(
+      env,
       "@cf/meta/m2m100-1.2b",
       { text, source_lang: "zh", target_lang: "en" },
-      aiGateway("translate", sessionId, "zh"),
+      "translate",
+      sessionId,
+      "zh",
     );
     const translated = result.translated_text?.trim();
     if (translated) return translated;
   } catch (error) {
+    if (error instanceof GuardrailReply) throw error;
     console.log(JSON.stringify({ event: "support_translate_failed", message: error instanceof Error ? error.message : "unknown" }));
   }
   return text;
@@ -365,7 +491,8 @@ async function answer(
     `\nQuestion: ${message}`,
   ].join("\n");
 
-  const result = await env.AI.run(
+  const result = await runAi(
+    env,
     "@cf/meta/llama-3.1-8b-instruct-fp8",
     {
       messages: [
@@ -375,27 +502,36 @@ async function answer(
       max_tokens: 300,
       temperature: 0.1,
     },
-    aiGateway("answer", sessionId, locale),
+    "answer",
+    sessionId,
+    locale,
   );
   const reply = result.response?.trim() ?? "";
   if (!reply || reply.includes(COPY.en.noInfo) || reply.includes(COPY.zh.noInfo)) return COPY[locale].noInfo;
-  return ensureVenueFacts(ensureTicketLink(reply, intentText, matches, locale), matches, locale);
+  const linked = ensureTicketLink(reply, intentText, matches, locale);
+  if (!isVenue(intentText)) return linked;
+  return ensureVenueFacts(linked, matches, locale);
 }
 
 async function seed(request: Request, env: Env): Promise<Response> {
   const token = request.headers.get("X-Seed-Token");
   if (!env.SEED_TOKEN || token !== env.SEED_TOKEN) return json(request, { error: "unauthorized" }, 401);
   const ids: string[] = [];
-  for (const chunk of CHUNKS) {
-    const values = await embed(env, chunk.text, "seed");
-    await env.SUPPORT_INDEX.upsert([
-      {
-        id: chunk.id,
-        values,
-        metadata: { ...chunk.metadata, text: chunk.text },
-      },
-    ]);
-    ids.push(chunk.id);
+  try {
+    for (const chunk of CHUNKS) {
+      const values = await embed(env, chunk.text, "seed");
+      await env.SUPPORT_INDEX.upsert([
+        {
+          id: chunk.id,
+          values,
+          metadata: { ...chunk.metadata, text: chunk.text },
+        },
+      ]);
+      ids.push(chunk.id);
+    }
+  } catch (error) {
+    if (error instanceof GuardrailReply) return json(request, { reply: error.reply });
+    throw error;
   }
   return json(request, { ok: true, ids });
 }
@@ -442,6 +578,9 @@ export default {
       console.log(JSON.stringify({ event: "support_turn", locale, upset, confidence: classified.confidence, lang: classified.lang }));
       return json(request, { reply });
     } catch (error) {
+      if (error instanceof GuardrailReply && error.reply) {
+        return json(request, { reply: error.reply });
+      }
       console.log(JSON.stringify({ event: "support_failed", message: error instanceof Error ? error.message : "unknown" }));
       return json(request, { reply: COPY[locale].fallback }, 500);
     }
