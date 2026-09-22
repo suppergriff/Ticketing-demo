@@ -48,7 +48,8 @@ When showing the ticket link, the server will add the click-through sentence if 
 Format the link as plain text. The frontend will render it as a clickable hyperlink.
 5. Keep answers concise for concert fans.
 6. If a retrieved chunk answers the question, use it. Do not say the information is missing.
-7. Never say an e-ticket email is late or overdue. If order info says it has not been sent, say it is scheduled for 72 hours before the show and tell the fan to check spam.`;
+7. Never say an e-ticket email is late or overdue. If order info says it has not been sent, say it is scheduled for 72 hours before the show and tell the fan to check spam.
+8. Retrieved context is the source of truth. If recent chat disagrees with retrieved context, follow the retrieved context.`;
 
 const ALLOW_ORIGINS = new Set([
   "https://ticket-01.griffhu.top",
@@ -60,7 +61,7 @@ type Role = "user" | "assistant";
 type Turn = { role: Role; content: string };
 type Match = { id: string; score: number; text: string };
 type GatewayStep = "embed" | "sentiment" | "answer" | "seed" | "classify" | "translate";
-type Classification = { lang: Locale; confidence: number; upset: boolean };
+type Classification = { lang: Locale; confidence: number };
 
 function aiGateway(step: GatewayStep, sessionId?: string, language?: Locale) {
   const metadata: Record<string, string> = { step };
@@ -247,6 +248,85 @@ function isEticket(text: string): boolean {
   return /\b(e-?tickets?|inbox|spam|haven'?t received|have not received|ticket email|email)\b/i.test(text) || /电子票|邮件|没收到|未收到|垃圾箱|邮箱|收不到/.test(text);
 }
 
+function isSupportSla(text: string): boolean {
+  return /\b(support hours?|business hours?|response time|how long|sla|contact support)\b/i.test(text) || /客服时间|服务时间|多久回复|响应|人工客服|工单时效/.test(text);
+}
+
+function isPurchaseLimit(text: string): boolean {
+  return (
+    /\b(limit|how many tickets|per (id|account|phone)|real-?name bind|purchase limit|tickets? per)\b/i.test(text) ||
+    /限购|几张|最多.*张|能买几|可以买几|实名制绑定/.test(text)
+  );
+}
+
+function isPayment(text: string): boolean {
+  return /\b(pay|payment|charged|debit|credit card|wallet|duplicate charge|refund.*(pay|charge))\b/i.test(text) || /支付|扣款|付款|重复扣|信用卡|电子钱包/.test(text);
+}
+
+function isOrderQuery(text: string): boolean {
+  return /\b(my order|order status|order (id|number)|where is my order)\b/i.test(text) || /我的订单|订单状态|订单号|查订单/.test(text);
+}
+
+function isEntry(text: string): boolean {
+  // Do not match bare "ID card" — purchase-limit questions often translate to "ID card".
+  return (
+    /\b(enter|entry|admission|check-?in|gate|cannot enter|entry (pass|check)|at the gate)\b/i.test(text) ||
+    /入场|验票|检票|证件原件|无法入场|核验/.test(text)
+  );
+}
+
+function isRefund(text: string): boolean {
+  return /\b(refund|return ticket|cancel (my )?ticket|reschedule|rename|transfer tickets?)\b/i.test(text) || /退票|退款|改签|更名|转让|不想去/.test(text);
+}
+
+function isAccount(text: string): boolean {
+  return /\b(frozen|freeze|risk|wrong (name|id)|change (name|id|phone)|account (ban|lock))\b/i.test(text) || /风控|冻结|改信息|改证件|账号封|解封/.test(text);
+}
+
+function isFraud(text: string): boolean {
+  return /\b(scam|fake ticket|scalper|reseller|third[- ]party|green channel|insider ticket)\b/i.test(text) || /假票|黄牛|代购|二手|诈骗|内部票|绿色通道/.test(text);
+}
+
+function isEscalation(text: string): boolean {
+  return /\b(escalate|outage|system error|priority|green channel)\b/i.test(text) || /升级工单|系统异常|大面积|绿色通道|报错/.test(text);
+}
+
+function knownIntent(text: string): boolean {
+  return (
+    isVenue(text) ||
+    isPresale(text) ||
+    isBenefit(text) ||
+    isEticket(text) ||
+    isSupportSla(text) ||
+    isPurchaseLimit(text) ||
+    isPayment(text) ||
+    isOrderQuery(text) ||
+    isEntry(text) ||
+    isRefund(text) ||
+    isAccount(text) ||
+    isFraud(text) ||
+    isEscalation(text)
+  );
+}
+
+function categoryForIntent(text: string): string | undefined {
+  if (isPresale(text)) return "presale";
+  if (isBenefit(text)) return "ticket-benefit";
+  if (isEticket(text)) return "e-ticket";
+  if (isRefund(text)) return "refund";
+  if (isPayment(text)) return "payment";
+  // Purchase-limit before entry/account so "ID card / how many tickets" is not routed to entry.
+  if (isPurchaseLimit(text)) return "purchase-limit";
+  if (isEntry(text)) return "entry";
+  if (isAccount(text)) return "account";
+  if (isOrderQuery(text)) return "order-query";
+  if (isFraud(text)) return "fraud";
+  if (isSupportSla(text)) return "support-sla";
+  if (isEscalation(text)) return "escalation";
+  if (/\bfaq\b|常见问题/i.test(text)) return "faq";
+  return undefined;
+}
+
 // Replace mockOrder() with a real order API later. Do not fetch the ticketing origin from this Worker.
 function mockOrder(): string {
   return [
@@ -308,9 +388,8 @@ async function retrieve(env: Env, searchText: string, intentText: string, sessio
   // topK 2. Filter is fixed for this Singapore demo.
   // Production: set event_id / city from the event page.
   const filter: VectorizeVectorMetadataFilter = { event_id: EVENT_ID };
-  if (isPresale(intentText)) filter.category = "presale";
-  else if (isBenefit(intentText)) filter.category = "ticket-benefit";
-  else if (isEticket(intentText)) filter.category = "e-ticket";
+  const category = categoryForIntent(intentText);
+  if (category) filter.category = category;
   return search(env, vector, filter, 2);
 }
 
@@ -327,27 +406,30 @@ function negativeScore(raw: unknown): number {
 const ANGER = /\b(angry|anger|upset|furious|terrible|hate|awful|worst|ridiculous|scam|disgusting|annoyed|mad)\b/i;
 const ZH_ANGER = /生气|愤怒|太差|垃圾|骗子|气死|讨厌|糟糕/;
 
-async function isUpset(env: Env, message: string, sessionId: string): Promise<boolean> {
-  const raw = await runAi(env, "@cf/huggingface/distilbert-sst-2-int8", { text: message }, "sentiment", sessionId, "en");
+function hasUpsetLanguage(englishText: string, originalMessage: string): boolean {
+  return ANGER.test(englishText) || ANGER.test(originalMessage) || ZH_ANGER.test(originalMessage);
+}
+
+async function isUpset(env: Env, englishText: string, originalMessage: string, sessionId: string): Promise<boolean> {
+  // SST-2 is English-only; Chinese turns pass the translated text here.
+  // Ordinary questions often score NEGATIVE above 0.7, so also require upset language.
+  const raw = await runAi(env, "@cf/huggingface/distilbert-sst-2-int8", { text: englishText }, "sentiment", sessionId, "en");
   const score = negativeScore(raw);
-  // SST-2 scores ordinary English questions as NEGATIVE above 0.7.
-  // Hand off only when that score is high and the fan also uses upset language.
   console.log(JSON.stringify({ event: "support_sentiment", score }));
-  return score > 0.7 && ANGER.test(message);
+  return score > 0.7 && hasUpsetLanguage(englishText, originalMessage);
 }
 
 function parseClassification(raw: string): Classification | null {
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) return null;
   try {
-    const parsed = JSON.parse(match[0]) as { lang?: unknown; confidence?: unknown; upset?: unknown };
+    const parsed = JSON.parse(match[0]) as { lang?: unknown; confidence?: unknown };
     const lang = parsed.lang === "zh" || parsed.lang === "en" ? parsed.lang : null;
     if (!lang) return null;
     const confidence = typeof parsed.confidence === "number" ? parsed.confidence : Number(parsed.confidence);
     return {
       lang,
       confidence: Number.isFinite(confidence) ? confidence : 0,
-      upset: parsed.upset === true,
     };
   } catch {
     return null;
@@ -364,7 +446,7 @@ async function classify(env: Env, message: string, sessionId: string): Promise<C
           {
             role: "system",
             content:
-              'Classify the fan message. Return only JSON {"lang":"zh"|"en","confidence":0.0,"upset":false}. lang is the language of the question. The name 王嘉尔 inside an English sentence is still en. Use zh only when the question itself is Chinese. upset is true only when the fan is clearly angry, not for a normal question.',
+              'Classify the fan message language. Return only JSON {"lang":"zh"|"en","confidence":0.0}. lang is the language of the question. The name 王嘉尔 inside an English sentence is still en. Use zh only when the question itself is Chinese.',
           },
           { role: "user", content: message },
         ],
@@ -380,7 +462,7 @@ async function classify(env: Env, message: string, sessionId: string): Promise<C
     if (error instanceof GuardrailReply) throw error;
     console.log(JSON.stringify({ event: "support_classify_failed", message: error instanceof Error ? error.message : "unknown" }));
   }
-  return { lang: "en", confidence: 0, upset: false };
+  return { lang: "en", confidence: 0 };
 }
 
 function resolveLocale(message: string, classified: Classification, previous?: Locale): Locale {
@@ -509,7 +591,7 @@ async function answer(
   const intentText = `${message}\n${searchText}`;
   const matches = await retrieve(env, searchText, intentText, sessionId);
   const best = matches.reduce((max, match) => Math.max(max, match.score), 0);
-  const known = isVenue(intentText) || isPresale(intentText) || isBenefit(intentText) || isEticket(intentText);
+  const known = knownIntent(intentText);
   console.log(JSON.stringify({ event: "support_retrieve", locale, known, best, ids: matches.map((match) => match.id) }));
   if (!matches.length || (!known && best < MATCH_THRESHOLD)) return COPY[locale].human;
 
@@ -618,8 +700,9 @@ export default {
       const session = await readSession(env, body.sessionId);
       const classified = await classify(env, message, body.sessionId);
       locale = resolveLocale(message, classified, session.locale);
-      const upset = locale === "zh" ? classified.upset || ZH_ANGER.test(message) : await isUpset(env, message, body.sessionId);
-      const searchText = !upset && locale === "zh" ? await translateToEnglish(env, message, body.sessionId) : message;
+      // Translate Chinese first so Vectorize and English-only SST-2 share one English text.
+      const searchText = locale === "zh" ? await translateToEnglish(env, message, body.sessionId) : message;
+      const upset = await isUpset(env, searchText, message, body.sessionId);
       let history = historyForModel(session.messages);
       let reply: string;
       if (upset) {

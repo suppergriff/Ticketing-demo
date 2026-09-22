@@ -369,14 +369,24 @@
     var greeted = false;
     var sending = false;
 
+    function sessionKey() {
+      return "nexusgate-chat-session";
+    }
+
     function sessionId() {
-      var key = "nexusgate-chat-session";
+      var key = sessionKey();
       var id = localStorage.getItem(key);
       if (!id) {
         id = crypto.randomUUID();
         localStorage.setItem(key, id);
       }
       return id;
+    }
+
+    function resetConversation() {
+      localStorage.removeItem(sessionKey());
+      log.innerHTML = "";
+      greeted = false;
     }
 
     function supportUrl() {
@@ -451,6 +461,8 @@
     function closePanel() {
       panel.hidden = true;
       panel.classList.remove("nexusgate-chat-open");
+      // Drop UI + session so the next open does not reuse a poisoned KV history.
+      resetConversation();
     }
 
     var launcher = document.getElementById("nexusgate-chat-launcher");
