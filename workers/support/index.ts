@@ -97,6 +97,8 @@ function errorEntries(body: unknown): Array<{ code?: unknown; message?: unknown 
 }
 
 function hasGuardrailCode(body: unknown): boolean {
+  const top = Number(asRecord(body)?.code);
+  if (top === 2016 || top === 2017) return true;
   return errorEntries(body).some((item) => {
     const code = Number(item.code);
     return code === 2016 || code === 2017;
@@ -125,18 +127,36 @@ function bodyMarksGuardrail(body: unknown): boolean {
   return false;
 }
 
+function plainText(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const text = value.trim();
+  if (!text || text.startsWith("{") || text.startsWith("[")) return "";
+  return text;
+}
+
 function guardrailMessage(body: unknown, rawText: string): string {
-  const record = asRecord(body);
-  const response = typeof record?.response === "string" ? record.response.trim() : "";
+  const record = asRecord(body) ?? asRecord(parseJson(rawText));
+  const code = Number(record?.code);
+  const errorLike = record?.success === false || record?.name === "AiGatewayError" || code === 2016 || code === 2017;
+  if (errorLike) {
+    const notice = plainText(record?.message) || plainText(record?.description);
+    if (notice) return notice;
+  }
+  const response = plainText(record?.response) || plainText(asRecord(record?.result)?.response);
   if (response) return response;
-  const nested = asRecord(record?.result);
-  const nestedResponse = typeof nested?.response === "string" ? nested.response.trim() : "";
-  if (nestedResponse) return nestedResponse;
   const fromError = errorEntries(body)
-    .map((item) => (typeof item.message === "string" ? item.message.trim() : ""))
+    .map((item) => plainText(item.message))
     .find(Boolean);
   if (fromError) return fromError;
-  return rawText.replace(/^\s*(?:2016|2017)\s*:\s*/, "").trim();
+  return "";
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 function isGuardrailBlock(status: number, headers: Headers, body: unknown): boolean {
@@ -146,13 +166,7 @@ function isGuardrailBlock(status: number, headers: Headers, body: unknown): bool
 function thrownGuardrailReply(error: unknown): GuardrailReply | null {
   if (error instanceof GuardrailReply) return error;
   const message = error instanceof Error ? error.message : "";
-  const parsed = (() => {
-    try {
-      return JSON.parse(message) as unknown;
-    } catch {
-      return null;
-    }
-  })();
+  const parsed = parseJson(message);
   if (!hasGuardrailCode(parsed) && !/\b2016\b|\b2017\b/.test(message) && !/security configurations/i.test(message)) return null;
   const reply = guardrailMessage(parsed, message);
   return reply ? new GuardrailReply(reply) : null;
@@ -425,6 +439,39 @@ async function writeSession(env: Env, sessionId: string, history: Turn[], user: 
   });
 }
 
+const SECURITY_REFUSAL =
+  /prompt blocked due to security configurations|security configurations|sql\s*注入|无法提供有关.*(sql|注入|攻击)|无法回答关于.*(sql|注入)|cannot (help|assist|provide|answer).*(sql|injection|attack)/i;
+
+function isBlockedAssistant(text: string): boolean {
+  return (
+    SECURITY_REFUSAL.test(text) ||
+    text.includes("AiGatewayError") ||
+    /"code"\s*:\s*2016/.test(text) ||
+    /"code"\s*:\s*2017/.test(text)
+  );
+}
+
+function isRiskyUserPrompt(text: string): boolean {
+  return /disregard|ignore (all|previous|prior) instr|system prompt|jailbreak|sql injection|炸药|炸毁|制作.*炸|绕过.*认证/i.test(text);
+}
+
+function historyForModel(history: Turn[]): Turn[] {
+  return history.filter((turn) => {
+    if (turn.role === "assistant" && isBlockedAssistant(turn.content)) return false;
+    if (turn.role === "user" && isRiskyUserPrompt(turn.content)) return false;
+    return true;
+  });
+}
+
+function stripSecurityBoilerplate(reply: string): string {
+  return reply
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line && !SECURITY_REFUSAL.test(line) && !/"success"\s*:\s*false/.test(line))
+    .join("\n")
+    .trim();
+}
+
 function withoutTicketUrls(reply: string): string {
   return reply.split(TICKET_URL).join("").split(LEGACY_TICKET_URL).join("");
 }
@@ -477,7 +524,9 @@ async function answer(
       return `${title}:\n${match.text}`;
     })
     .join("\n\n");
-  const historyText = history.map((turn) => `${turn.role}: ${turn.content}`).join("\n");
+  const historyText = historyForModel(history)
+    .map((turn) => `${turn.role}: ${turn.content}`)
+    .join("\n");
   const order = loggedIn ? mockOrder() : "none. The fan is not signed in.";
   const userContent = [
     `Reply language: ${locale === "zh" ? "Chinese" : "English"}.`,
@@ -506,7 +555,7 @@ async function answer(
     sessionId,
     locale,
   );
-  const reply = result.response?.trim() ?? "";
+  const reply = stripSecurityBoilerplate(result.response?.trim() ?? "");
   if (!reply || reply.includes(COPY.en.noInfo) || reply.includes(COPY.zh.noInfo)) return COPY[locale].noInfo;
   const linked = ensureTicketLink(reply, intentText, matches, locale);
   if (!isVenue(intentText)) return linked;
@@ -571,14 +620,26 @@ export default {
       locale = resolveLocale(message, classified, session.locale);
       const upset = locale === "zh" ? classified.upset || ZH_ANGER.test(message) : await isUpset(env, message, body.sessionId);
       const searchText = !upset && locale === "zh" ? await translateToEnglish(env, message, body.sessionId) : message;
-      const reply = upset
-        ? COPY[locale].upset
-        : await answer(env, message, searchText, session.messages, body.isLogin === true, body.sessionId, locale);
-      await writeSession(env, body.sessionId, session.messages, message, reply, locale);
+      let history = historyForModel(session.messages);
+      let reply: string;
+      if (upset) {
+        reply = COPY[locale].upset;
+      } else {
+        try {
+          reply = await answer(env, message, searchText, history, body.isLogin === true, body.sessionId, locale);
+        } catch (error) {
+          if (!(error instanceof GuardrailReply) || history.length === 0) throw error;
+          // An earlier blocked turn is still in this session and gets sent with the new question.
+          history = [];
+          reply = await answer(env, message, searchText, history, body.isLogin === true, body.sessionId, locale);
+        }
+      }
+      await writeSession(env, body.sessionId, historyForModel(session.messages), message, reply, locale);
       console.log(JSON.stringify({ event: "support_turn", locale, upset, confidence: classified.confidence, lang: classified.lang }));
       return json(request, { reply });
     } catch (error) {
       if (error instanceof GuardrailReply && error.reply) {
+        // Do not store blocked prompts; they poison the next ticket question.
         return json(request, { reply: error.reply });
       }
       console.log(JSON.stringify({ event: "support_failed", message: error instanceof Error ? error.message : "unknown" }));
