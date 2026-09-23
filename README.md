@@ -32,7 +32,7 @@ This repo already includes a demo `.env`, `data/tickets.db`, and 200 ticket JPGs
 Optional re-seed:
 
 ```bash
-npm run seed:fast          # 200 tickets
+npm run seed:fastnpm          # 200 tickets
 SEED_COUNT=10000 npm run seed
 ```
 
