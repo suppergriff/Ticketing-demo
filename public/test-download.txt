@@ -1,0 +1,8 @@
+Ticketing-demo static download test
+
+This is a harmless file used to verify that public/ assets
+are reachable via HTTPS, for example:
+
+  curl -k -L https://ticket-01.griffhu.top/test-download.txt -o test-download.txt
+
+If you can read this text after downloading, static serving works.
